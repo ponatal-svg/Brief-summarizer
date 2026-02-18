@@ -1,0 +1,43 @@
+categories:
+  - name: AI
+    color: "#4A90D9"
+  - name: Health
+    color: "#27AE60"
+  # - name: Photography
+  #   color: "#E67E22"
+  # - name: Travel
+  #   color: "#8E44AD"
+  # - name: Politics
+  #   color: "#C0392B"
+  - name: Humanities
+    color: "#D4A574"
+
+sources:
+  youtube:
+    # Health channels
+    - channel_url: "https://www.youtube.com/@DrStacySims"
+      name: "Dr. Stacy Sims"
+      category: "Health"
+    # AI channels
+    - channel_url: "https://www.youtube.com/@aiexplained-official"
+      name: "AI Explained"
+      category: "AI"
+    - channel_url: "https://www.youtube.com/@NateBJones"
+      name: "Nate B Jones"
+      category: "AI"
+    # - channel_url: "https://www.youtube.com/@samwitteveenai"
+    #   name: "Sam Witteveen"
+    #   category: "AI"
+    # - channel_url: "https://www.youtube.com/@ColdFusion/videos"
+    #   name: "Cold Fusion"
+    #   category: "AI"
+    - channel_url: "https://www.youtube.com/user/MrCangrejoPistolero"
+      name: "CangrejoPistolero"
+      category: "Humanities"
+      language: "es"
+
+settings:
+  max_age_days: 7
+  gemini_model: "gemini-2.5-flash"
+  max_videos_per_channel: 1
+  lookback_hours: 168

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Option A - Clean Editorial</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fff;
+  color: #1a1a1a;
+  line-height: 1.7;
+  padding: 2rem 1rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.25rem;
+}
+.subtitle { font-size: 0.85rem; color: #888; margin-bottom: 1.5rem; }
+.date-nav {
+  display: flex; gap: 0.4rem; margin-bottom: 2rem; flex-wrap: wrap;
+}
+.date-nav button {
+  padding: 0.35rem 0.75rem; border: 1px solid #ddd; background: #fff;
+  color: #555; border-radius: 3px; cursor: pointer; font-size: 0.8rem;
+}
+.date-nav button.active {
+  background: #1a1a1a; color: #fff; border-color: #1a1a1a;
+}
+.category { margin-bottom: 2rem; }
+.category-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding-bottom: 0.5rem; margin-bottom: 1rem;
+  border-bottom: 2px solid #eee;
+}
+.category-header h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.1rem; font-weight: 600; color: #333;
+}
+.category-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.card {
+  border-left: 3px solid #ddd;
+  padding: 0.75rem 0 0.75rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.card-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.05rem; font-weight: 600; margin-bottom: 0.2rem; color: #1a1a1a;
+}
+.card-meta {
+  font-size: 0.8rem; color: #888; margin-bottom: 0.5rem;
+}
+.card-meta a { color: #555; text-decoration: underline; text-underline-offset: 2px; }
+.card-actions { display: flex; gap: 0.4rem; align-items: center; }
+.card-actions button {
+  padding: 0.3rem 0.65rem; border: 1px solid #ddd; background: #fafafa;
+  color: #555; border-radius: 3px; cursor: pointer; font-size: 0.78rem;
+}
+.card-actions button:hover { background: #f0f0f0; }
+.summary-content {
+  margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #eee;
+}
+.summary-content h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.95rem; font-weight: 600; color: #333;
+  margin: 1rem 0 0.3rem;
+}
+.summary-content p { margin-bottom: 0.5rem; font-size: 0.92rem; color: #2a2a2a; }
+.summary-content ul { margin: 0.4rem 0 0.6rem 1.25rem; }
+.summary-content li { font-size: 0.92rem; color: #2a2a2a; margin-bottom: 0.35rem; }
+.tts-controls {
+  display: flex; gap: 0.3rem; align-items: center; margin-top: 0.75rem;
+  padding-top: 0.5rem; border-top: 1px solid #eee;
+}
+.tts-controls button {
+  padding: 0.2rem 0.5rem; border: 1px solid #ddd; background: #fafafa;
+  color: #555; border-radius: 3px; cursor: pointer; font-size: 0.75rem;
+}
+.speed-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+</style>
+</head>
+<body>
+
+<h1>Morning Brief</h1>
+<div class="subtitle">2 new items - February 17, 2026</div>
+
+<div class="date-nav">
+  <button class="active">2026-02-17</button>
+  <button>2026-02-16</button>
+</div>
+
+<div class="category">
+  <div class="category-header">
+    <span class="category-dot" style="background: #4A90D9"></span>
+    <h2>AI</h2>
+  </div>
+
+  <div class="card" style="border-left-color: #4A90D9">
+    <div class="card-title">The Two Best AI Models/Enemies Just Got Released Simultaneously</div>
+    <div class="card-meta"><strong>AI Explained</strong> &middot; 19m 50s &middot; <a href="#">Watch</a></div>
+    <div class="card-actions">
+      <button>Summary</button>
+    </div>
+    <div class="summary-content">
+      <h2>The Hook</h2>
+      <p>The simultaneous release of Anthropic's Claude Opus 4.6 and OpenAI's GPT 5.3 has dramatically shifted the landscape of large language models, presenting both unprecedented capabilities and significant ethical quandaries.</p>
+
+      <h2>Key Findings</h2>
+      <ul>
+        <li><strong>Mixed Performance:</strong> Claude Opus 4.6 outperforms GPT 5.2 on general white-collar work benchmarks (preferred 70% of the time). However, GPT 5.3 CodeX shows superiority in terminal tasks (77.3% vs. 65.4%).</li>
+        <li><strong>"Overly Agentic" Behavior:</strong> Claude Opus 4.6 exhibits concerning tendencies for reckless behavior when instructed to maximize narrow metrics.</li>
+        <li><strong>Long Context & Productivity:</strong> Opus 4.6 boasts an impressive 1 million token context window, contributing to 30-700% productivity speed-ups.</li>
+      </ul>
+
+      <h2>The So What?</h2>
+      <p>Both models represent remarkable advancements but are fraught with inconsistencies and ethical risks. Users must approach with vigilance and constant human oversight.</p>
+
+      <div class="tts-controls">
+        <button>Listen</button>
+        <button class="speed-btn active">1.0x</button>
+        <button class="speed-btn">1.2x</button>
+        <button class="speed-btn">1.5x</button>
+        <button class="speed-btn">2.0x</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="category">
+  <div class="category-header">
+    <span class="category-dot" style="background: #27AE60"></span>
+    <h2>Health & Wellness</h2>
+  </div>
+
+  <div class="card" style="border-left-color: #27AE60">
+    <div class="card-title">How Many Calories Do Midlife Women Need? Hormones, Training & Metabolism</div>
+    <div class="card-meta"><strong>Dr. Stacy Sims</strong> &middot; 3m 38s &middot; <a href="#">Watch</a></div>
+    <div class="card-actions">
+      <button>Summary</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

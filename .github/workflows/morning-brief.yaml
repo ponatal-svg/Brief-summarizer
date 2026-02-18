@@ -1,0 +1,42 @@
+name: Morning Brief
+
+on:
+  schedule:
+    # Run at 4 AM UTC daily
+    - cron: '0 4 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install yt-dlp
+
+      - name: Run Morning Brief pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m src.main --verbose
+
+      - name: Commit and push output
+        run: |
+          git config user.name "Morning Brief Bot"
+          git config user.email "bot@morning-brief.local"
+          git add output/ state.json
+          git diff --staged --quiet || git commit -m "Morning Brief update: $(date -u +%Y-%m-%d)"
+          git push

@@ -1,0 +1,7 @@
+yt-dlp>=2024.0.0
+youtube-transcript-api>=1.0.0
+google-genai>=1.0.0
+pyyaml>=6.0
+jinja2>=3.1
+pytest>=8.0
+pytest-mock>=3.12
