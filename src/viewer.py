@@ -48,29 +48,32 @@ body {
   line-height: 1.6;
 }
 
-/* === HEADER === */
+/* === ROW 1: HEADER — title + date pills === */
 .header {
   max-width: 1000px;
   margin: 0 auto;
   padding: 40px 32px 0;
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-.header-left h1 {
+.header h1 {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.3px;
+  flex-shrink: 0;
 }
-.header-left h1 span {
+.header h1 span {
   font-weight: 300;
   color: var(--text-light);
   margin-left: 4px;
 }
-.header-date {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--text-light);
+.date-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 /* === DATE NAV === */
@@ -78,11 +81,11 @@ body {
   display: none;
 }
 
-/* === FILTER & TOOLBAR === */
+/* === ROW 2: TOOLBAR — category filters + expand all === */
 .toolbar {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 20px 32px 0;
+  padding: 14px 32px 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -96,11 +99,7 @@ body {
   flex-wrap: wrap;
 }
 .toolbar-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
-  margin: 0 4px;
-  flex-shrink: 0;
+  display: none;
 }
 .date-btn {
   font-family: 'JetBrains Mono', monospace;
@@ -398,18 +397,14 @@ body {
 </head>
 <body>
 <header class="header">
-  <div class="header-left">
-    <h1>Morning Brief<span>/ daily</span></h1>
-  </div>
-  <div class="header-date" id="headerDate"></div>
+  <h1>Morning Brief<span>/ daily</span></h1>
+  <div class="date-pills" id="dateButtons"></div>
 </header>
 
 <nav class="date-nav" id="dateNav"></nav>
 
 <div class="toolbar">
   <div class="toolbar-left">
-    <div id="dateButtons"></div>
-    <div class="toolbar-sep"></div>
     <div class="filters" id="filters"></div>
   </div>
   <button class="expand-all-btn" id="expandAllBtn" onclick="toggleExpandAll()">
@@ -565,14 +560,6 @@ async function loadDate(dateStr) {
     b.classList.toggle('active', b.textContent === dateStr);
   });
 
-  try {
-    var d = new Date(dateStr + 'T00:00:00');
-    document.getElementById('headerDate').textContent =
-      dateStr + ' \\u2014 ' + d.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
-  } catch(e) {
-    document.getElementById('headerDate').textContent = dateStr;
-  }
-
   var content = document.getElementById('content');
   content.innerHTML = '<div id="loading">loading...</div>';
 
@@ -622,9 +609,14 @@ function renderDigest(md, dateStr) {
       currentCard.channel = channel;
       currentCard.duration = duration;
 
-      html += '<span class="card-source">' + channel + '</span>';
-      if (duration) html += '<span class="card-duration">' + duration + '</span>';
-      if (pubDate && pubDate.length === 10 && pubDate[4] === '-') html += '<span class="card-duration">' + pubDate + '</span>';
+      var metaParts = [channel];
+      if (duration) metaParts.push(duration);
+      if (pubDate && pubDate.length === 10 && pubDate[4] === '-') {
+        var pd = new Date(pubDate + 'T00:00:00');
+        var formatted = pd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        metaParts.push(formatted);
+      }
+      html += '<span class="card-source">' + metaParts.join(' · ') + '</span>';
       html += '</div>';
       html += '<h3 class="card-title">' + currentCard.title + '</h3>';
 

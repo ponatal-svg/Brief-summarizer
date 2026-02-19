@@ -324,8 +324,8 @@ class TestDateNavigation:
         fn_block = generated_html[generated_html.index("function loadDate("):]
         assert "classList.toggle('active'" in fn_block
 
-    def test_header_date_updates(self, generated_html):
-        assert "getElementById('headerDate')" in generated_html
+    def test_date_pills_in_header(self, generated_html):
+        assert 'class="date-pills"' in generated_html or 'id="dateButtons"' in generated_html
 
     def test_fetches_daily_digest(self, generated_html):
         assert "fetch('daily/'" in generated_html
