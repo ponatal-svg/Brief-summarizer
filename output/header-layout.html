@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Header Layout Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --text: #111111;
+  --text-mid: #555555;
+  --text-light: #999999;
+  --border: #E5E5E5;
+  --hover: #F0EFED;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* === ROW 1: title + date pills === */
+.header {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 32px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.header h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  flex-shrink: 0;
+}
+.header h1 span {
+  font-weight: 300;
+  color: var(--text-light);
+  margin-left: 4px;
+}
+.date-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.date-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.date-btn:hover { background: var(--hover); border-color: var(--text-light); }
+.date-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+/* === ROW 2: category filters + expand all === */
+.toolbar {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 14px 32px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: lowercase;
+}
+.filter-btn:hover { background: var(--hover); border-color: var(--text-light); }
+.filter-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+.expand-all-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.divider {
+  max-width: 1000px;
+  margin: 14px auto 0;
+  padding: 0 32px;
+}
+.divider hr { border: none; height: 1px; background: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- ROW 1: Morning Brief / daily  [2026-02-18] [2026-02-17] [2026-02-16] -->
+<header class="header">
+  <h1>Morning Brief<span>/ daily</span></h1>
+  <div class="date-pills">
+    <button class="date-btn active">2026-02-18</button>
+    <button class="date-btn">2026-02-17</button>
+    <button class="date-btn">2026-02-16</button>
+  </div>
+</header>
+
+<!-- ROW 2: [all] [ai] [health] [humanities]          [→ expand all] -->
+<div class="toolbar">
+  <div class="filters">
+    <button class="filter-btn active">all</button>
+    <button class="filter-btn">ai</button>
+    <button class="filter-btn">health</button>
+    <button class="filter-btn">humanities</button>
+  </div>
+  <button class="expand-all-btn">
+    <span>&rarr;</span> expand all
+  </button>
+</div>
+
+<div class="divider"><hr></div>
+
+</body>
+</html>
