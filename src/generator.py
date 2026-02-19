@@ -102,9 +102,15 @@ def generate_daily_digest(
     daily_dir.mkdir(parents=True, exist_ok=True)
     digest_path = daily_dir / f"{date_str}.md"
 
+    # Merge with existing digest entries for today (if the file already exists)
+    existing_entries = _parse_existing_digest(digest_path, output_dir) if digest_path.exists() else []
+    new_video_ids = {e["video"].video_id for e in entries}
+    merged_entries = [e for e in existing_entries if e["video_id"] not in new_video_ids]
+    all_entries = entries + [_stub_entry(e) for e in merged_entries]
+
     # Group entries by category
     by_category = {}
-    for entry in entries:
+    for entry in all_entries:
         cat = entry["video"].category
         by_category.setdefault(cat, []).append(entry)
 
@@ -113,11 +119,11 @@ def generate_daily_digest(
         "",
     ]
 
-    if not entries:
+    if not all_entries:
         lines.append("No new content found today.")
         lines.append("")
     else:
-        lines.append(f"**{len(entries)} new item(s)**")
+        lines.append(f"**{len(all_entries)} item(s)**")
         lines.append("")
 
         # Output in category order
@@ -126,6 +132,8 @@ def generate_daily_digest(
             cat_entries = by_category.get(cat_name, [])
             if not cat_entries:
                 continue
+            # Re-sort by category order (new entries first, then existing)
+            cat_entries = sorted(cat_entries, key=lambda e: e.get("_existing", False))
 
             lines.append(f"## {cat_name}")
             lines.append("")
@@ -148,11 +156,13 @@ def generate_daily_digest(
                     lines.append(f"> Error: {error}")
                     lines.append("")
                 elif paths:
-                    summary_rel = _relative_path(paths["summary_path"], output_dir)
-                    lines.append(
-                        f"[Summary]({summary_rel})"
-                    )
-                    lines.append("")
+                    if entry.get("_existing"):
+                        summary_rel = paths.get("summary_rel", "")
+                    else:
+                        summary_rel = _relative_path(paths["summary_path"], output_dir)
+                    if summary_rel:
+                        lines.append(f"[Summary]({summary_rel})")
+                        lines.append("")
 
         # Include any categories not in the config order
         for cat_name in sorted(by_category.keys()):
@@ -169,6 +179,75 @@ def generate_daily_digest(
     digest_path.write_text("\n".join(lines), encoding="utf-8")
     logger.info(f"Generated daily digest: {digest_path}")
     return digest_path
+
+
+def _parse_existing_digest(digest_path: Path, output_dir: Path) -> list:
+    """Parse an existing daily digest to extract entry stubs for merging."""
+    from src.fetchers.youtube import VideoInfo
+    from datetime import datetime, timezone
+
+    entries = []
+    try:
+        text = digest_path.read_text(encoding="utf-8")
+    except OSError:
+        return entries
+
+    current_category = None
+    current: dict = {}
+
+    for line in text.splitlines():
+        if line.startswith("## "):
+            current_category = line[3:].strip()
+        elif line.startswith("### "):
+            if current:
+                entries.append(current)
+            current = {"category": current_category, "title": line[4:].strip(),
+                       "channel": "", "duration": "", "watch_url": "",
+                       "pub_date": "", "summary_rel": "", "video_id": ""}
+        elif current and line.startswith("**") and "|" in line:
+            parts = line.replace("**", "").split("|")
+            current["channel"] = parts[0].strip() if len(parts) > 0 else ""
+            current["pub_date"] = parts[2].strip() if len(parts) > 2 else ""
+            watch_match = re.search(r'\[Watch\]\(([^)]+)\)', line)
+            if watch_match:
+                current["watch_url"] = watch_match.group(1)
+                vid_match = re.search(r'v=([A-Za-z0-9_-]+)', current["watch_url"])
+                if vid_match:
+                    current["video_id"] = vid_match.group(1)
+        elif current and line.startswith("[Summary]"):
+            match = re.search(r'\[Summary\]\(([^)]+)\)', line)
+            if match:
+                current["summary_rel"] = match.group(1)
+
+    if current:
+        entries.append(current)
+
+    return entries
+
+
+def _stub_entry(existing: dict) -> dict:
+    """Convert a parsed existing digest entry back into a generator entry dict."""
+    from src.fetchers.youtube import VideoInfo
+    from datetime import datetime, timezone
+
+    try:
+        upload_date = datetime.strptime(existing["pub_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except (ValueError, KeyError):
+        upload_date = datetime.now(timezone.utc)
+
+    video = VideoInfo(
+        video_id=existing.get("video_id", ""),
+        title=existing.get("title", ""),
+        url=existing.get("watch_url", ""),
+        channel_name=existing.get("channel", ""),
+        category=existing.get("category", ""),
+        upload_date=upload_date,
+        duration_seconds=0,
+        transcript="",
+        language="en",
+    )
+    paths = {"summary_path": None, "slug": None, "summary_rel": existing.get("summary_rel", "")}
+    return {"video": video, "paths": paths, "error": None, "_existing": True}
 
 
 def generate_error_report(errors: list, output_dir: Path, date_str: str) -> Optional[Path]:

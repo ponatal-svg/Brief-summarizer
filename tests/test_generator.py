@@ -156,7 +156,7 @@ class TestGenerateDailyDigest:
         assert "## AI" in content
         assert "Understanding Neural Networks" in content
         assert "AI Channel" in content
-        assert "1 new item(s)" in content
+        assert "1 item(s)" in content
         assert "[Summary]" in content
         assert "2026-02-16" in content  # publish date in metadata
 
