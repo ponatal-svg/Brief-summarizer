@@ -11,6 +11,12 @@ from google import genai
 
 logger = logging.getLogger(__name__)
 
+
+class QuotaExhaustedError(Exception):
+    """Raised when the Gemini daily quota is exhausted."""
+    pass
+
+
 # Retry settings
 MAX_RETRIES = 4
 INITIAL_BACKOFF_SECONDS = 5
@@ -182,11 +188,28 @@ def _call_gemini(client: genai.Client, model: str, prompt: str) -> str:
             return response.text or ""
         except Exception as e:
             last_error = e
-            error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            error_str = str(e).lower()
+
+            # --- Authentication / bad key (401/403) — abort immediately, no point retrying ---
+            if "401" in str(e) or "403" in str(e) or "api_key_invalid" in error_str or "permission_denied" in error_str:
+                logger.error(f"Gemini authentication error — check your API key: {e}")
+                raise
+
+            # --- Daily quota exhausted (RPD) — abort run, save partial progress ---
+            if "429" in str(e) or "resource_exhausted" in error_str:
+                if "daily" in error_str or "per day" in error_str or "quota exceeded" in error_str:
+                    logger.error("Gemini daily quota exhausted — aborting run to avoid wasted retries")
+                    raise QuotaExhaustedError("Gemini daily quota exhausted") from e
+                # Per-minute rate limit (RPM) — retryable
                 logger.warning(f"  Rate limited (attempt {attempt + 1}/{MAX_RETRIES + 1})")
                 continue
-            # Non-retryable error
+
+            # --- Server errors (5xx) — retryable ---
+            if "500" in str(e) or "502" in str(e) or "503" in str(e) or "unavailable" in error_str:
+                logger.warning(f"  Gemini server error, retrying (attempt {attempt + 1}/{MAX_RETRIES + 1}): {e}")
+                continue
+
+            # --- Any other error — not retryable ---
             logger.error(f"Gemini API error: {e}")
             raise
 

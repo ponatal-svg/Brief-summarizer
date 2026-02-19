@@ -12,6 +12,7 @@ from src.summarizer import (
     _call_gemini,
     _format_duration_for_prompt,
     _get_language_name,
+    QuotaExhaustedError,
     SUMMARY_PROMPT,
     NO_TRANSCRIPT_PROMPT,
 )
@@ -122,6 +123,92 @@ class TestCallGemini:
 
         # 1 initial + 4 retries = 5 attempts
         assert mock_client.models.generate_content.call_count == 5
+
+    @patch("src.summarizer.time.sleep")
+    def test_daily_quota_raises_quota_exhausted_error(self, mock_sleep):
+        """RPD (daily) quota hit → QuotaExhaustedError raised immediately, no retries."""
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = RuntimeError(
+            "429 RESOURCE_EXHAUSTED: daily quota exceeded"
+        )
+
+        with pytest.raises(QuotaExhaustedError):
+            _call_gemini(mock_client, "gemini-2.0-flash", "test prompt")
+
+        # Should raise immediately, no retries
+        assert mock_client.models.generate_content.call_count == 1
+
+    @patch("src.summarizer.time.sleep")
+    def test_per_day_quota_raises_quota_exhausted_error(self, mock_sleep):
+        """'per day' in error message also triggers QuotaExhaustedError."""
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = RuntimeError(
+            "429 RESOURCE_EXHAUSTED: Quota exceeded for quota metric 'per day'"
+        )
+
+        with pytest.raises(QuotaExhaustedError):
+            _call_gemini(mock_client, "gemini-2.0-flash", "test prompt")
+
+        assert mock_client.models.generate_content.call_count == 1
+
+    @patch("src.summarizer.time.sleep")
+    def test_auth_error_401_raises_immediately(self, mock_sleep):
+        """Invalid API key → raises immediately, no retries."""
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = RuntimeError(
+            "401 API_KEY_INVALID"
+        )
+
+        with pytest.raises(RuntimeError, match="401"):
+            _call_gemini(mock_client, "gemini-2.0-flash", "test prompt")
+
+        assert mock_client.models.generate_content.call_count == 1
+
+    @patch("src.summarizer.time.sleep")
+    def test_auth_error_403_raises_immediately(self, mock_sleep):
+        """Permission denied → raises immediately, no retries."""
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = RuntimeError(
+            "403 PERMISSION_DENIED"
+        )
+
+        with pytest.raises(RuntimeError, match="403"):
+            _call_gemini(mock_client, "gemini-2.0-flash", "test prompt")
+
+        assert mock_client.models.generate_content.call_count == 1
+
+    @patch("src.summarizer.time.sleep")
+    def test_server_error_500_retries(self, mock_sleep):
+        """5xx server errors are retried like rate limits."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "OK after server error"
+
+        mock_client.models.generate_content.side_effect = [
+            RuntimeError("500 Internal Server Error"),
+            RuntimeError("503 Service Unavailable"),
+            mock_response,
+        ]
+
+        result = _call_gemini(mock_client, "gemini-2.0-flash", "test prompt")
+        assert result == "OK after server error"
+        assert mock_client.models.generate_content.call_count == 3
+
+    @patch("src.summarizer.time.sleep")
+    def test_rpm_rate_limit_does_not_raise_quota_error(self, mock_sleep):
+        """Generic 429 without 'daily'/'per day' is RPM — retried, not treated as quota exhausted."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "OK"
+
+        mock_client.models.generate_content.side_effect = [
+            RuntimeError("429 RESOURCE_EXHAUSTED: rate limit"),
+            mock_response,
+        ]
+
+        result = _call_gemini(mock_client, "gemini-2.0-flash", "test prompt")
+        assert result == "OK"
+        assert mock_client.models.generate_content.call_count == 2
 
 
 class TestFormatDurationForPrompt:

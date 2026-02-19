@@ -1,6 +1,6 @@
 # Morning Brief - Project Status
 
-**Last updated:** 2026-02-18
+**Last updated:** 2026-02-19
 
 ## What It Does
 
@@ -10,20 +10,20 @@ Morning Brief is an automated content summarization pipeline that monitors YouTu
 
 | Requirement | Status |
 |---|---|
-| Monitor 10-20 YouTube channels | 4 channels active (expanding) |
+| Monitor 10-20 YouTube channels | 5 channels active (expanding) |
 | Monitor 10 Spotify podcasts | Phase 2 (not started) |
 | Monitor 10 web pages | Phase 3 (not started) |
-| Daily automated runs via GitHub Actions | Built, not yet deployed |
-| Process only new content (state tracking) | Done |
-| Sources mapped to categories via YAML config | Done |
-| Adaptive summaries (Hook / Key Findings / So What) | Done |
-| Daily digest with links to source and summaries | Done |
-| Viewable on computer/phone (GitHub Pages) | Built, not yet deployed |
-| Listenable via TTS at 1.0x, 1.2x, 1.5x, 2.0x | Done |
-| Content expires after 7 days | Done |
-| Error reports generated as .md files | Done |
-| Budget $0-$20/mo | On track ($0 currently) |
-| Unit tests for all critical logic | **219 tests passing** |
+| Daily automated runs via GitHub Actions | ✅ Live |
+| Process only new content (state tracking) | ✅ Done |
+| Sources mapped to categories via YAML config | ✅ Done |
+| Adaptive summaries (Hook / Key Findings / So What) | ✅ Done |
+| Daily digest with links to source and summaries | ✅ Done |
+| Viewable on computer/phone (GitHub Pages) | ✅ Live at ponatal-svg.github.io/Brief-summarizer |
+| Listenable via TTS at 1.0x, 1.2x, 1.5x, 2.0x | ✅ Done |
+| Content expires after 7 days | ✅ Done |
+| Error reports generated as .md files | ✅ Done |
+| Budget $0-$20/mo | ✅ On track ($0 currently) |
+| Unit tests for all critical logic | ✅ 225 tests passing |
 
 ## Architecture
 
@@ -62,57 +62,71 @@ output/
 | Summarization | Gemini 2.5 Flash API (free tier) | Free |
 | Text-to-Speech | Browser Web Speech API | Free |
 | Scheduling | GitHub Actions (cron 4am UTC) | Free |
-| Hosting | GitHub Pages | Free |
+| Hosting | GitHub Pages (public repo) | Free |
 | Config | YAML | - |
 | State | JSON file | - |
 
 ## Current Config
 
-- **Channels (4 active):**
+- **Channels (5 active):**
   - Dr. Stacy Sims (Health)
   - AI Explained (AI)
   - Nate B Jones (AI)
+  - Sam Witteveen (AI)
+  - Cold Fusion (AI)
   - CangrejoPistolero (Humanities, Spanish)
-- **Commented out:** Sam Witteveen (AI), Cold Fusion (AI)
-- **Model:** gemini-2.5-flash
-- **Lookback:** 168 hours (7 days) — set to 26h for production
-- **Max videos/channel:** 1 — increase to 3 for production
 - **Active categories:** AI, Health, Humanities
-- **Commented out:** Photography, Travel, Politics
+- **Inactive categories (no channels yet):** Photography, Travel, Politics
+- **Model:** gemini-2.5-flash
+- **Lookback:** 168 hours (7 days) — change to 26h for production
+- **Max videos/channel:** 1 — change to 3 for production
 
 ## Latest Run (2026-02-18)
 
 4 videos summarized successfully:
 
-| Title | Channel | Category | Duration |
-|---|---|---|---|
-| The Two Best AI Models/Enemies Just Got Released Simultaneously | AI Explained | AI | 19m 50s |
-| The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2) | Nate B Jones | AI | 42m 15s |
-| Is Yoga Enough for Women? What Women Need for Strength & Longevity | Dr. Stacy Sims | Health | 3m 52s |
-| The BIGGEST SCAM in MODERN ART | CangrejoPistolero | Humanities | 22m 16s |
+| Title | Channel | Category |
+|---|---|---|
+| The Two Best AI Models/Enemies Just Got Released Simultaneously | AI Explained | AI |
+| The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2) | Nate B Jones | AI |
+| Is Yoga Enough for Women? What Women Need for Strength & Longevity | Dr. Stacy Sims | Health |
+| The BIGGEST SCAM in MODERN ART | CangrejoPistolero | Humanities |
 
-State tracks 4 processed video IDs.
+1 video skipped (Sam Witteveen — no transcript available, will retry).
 
 ## Summary Format
 
-Adaptive length based on video duration using 3-layer architecture:
-- **Short videos (<5 min):** 100-150 words
-- **Medium videos (10-20 min):** 300-500 words
-- **Long videos/podcasts (60+ min):** 600-800 words
+Adaptive length based on video duration:
+- **Short (<5 min):** 100-150 words
+- **Medium (10-20 min):** 300-500 words
+- **Long (60+ min):** 600-800 words
 
-Structure:
-1. **The Hook** - 1-2 sentences on why this matters now
-2. **Key Findings** - 3-5 bullet points with data/specifics
-3. **The So What?** - Broader context and implications
+Structure: **The Hook** → **Key Findings** → **The So What?**
 
 Golden rule: summary never takes more than 10% of video length to read.
 
 ## API Usage (per run)
 
-- **YouTube requests:** ~3-5 per channel (1 yt-dlp listing + 1-3 transcript fetches)
-- **Gemini API calls:** 1 per video
-- **Free tier limits:** 20 requests/day, 5 RPM for Gemini 2.5 Flash
-- **Throttle:** 5s between Gemini calls + exponential backoff on 429
+- **YouTube requests:** ~3-5 per channel
+- **Gemini API calls:** 1 per video with transcript
+- **Free tier limits:** 20 req/day, 5 RPM
+- **Throttle:** 5s between calls + exponential backoff on 429
+
+## Error Handling
+
+| Error | Behaviour | Action needed? |
+|---|---|---|
+| RPM rate limit (429 burst) | Retry ×4 with 5→10→20→40s backoff | No |
+| RPD daily quota exhausted | Save partial progress, abort cleanly, retry tomorrow | No |
+| 5xx server error | Retry ×4 | No |
+| Invalid/expired API key | sys.exit(1) → GitHub Actions red ❌ + email | **Yes — fix secret** |
+| Missing API key | sys.exit(1) → GitHub Actions red ❌ + email | **Yes — add secret** |
+| No transcript | Skip video, log warning, continue | No |
+| YouTube IP block | Channel skipped, error report written | Maybe — retry next day |
+| Config error | sys.exit(1) → GitHub Actions red ❌ + email | **Yes — fix config.yaml** |
+
+**Monitoring:** GitHub Actions sends email on failure (configure at github.com/settings/notifications).
+Error details written to `output/errors/YYYY-MM-DD-errors.md`.
 
 ## File Inventory
 
@@ -121,8 +135,8 @@ Golden rule: summary never takes more than 10% of video length to read.
 |---|---|---|
 | config.py | YAML config loader with dataclasses + validation | 18 tests |
 | fetchers/youtube.py | Video listing (yt-dlp) + transcripts (youtube-transcript-api) | 17 tests |
-| summarizer.py | Gemini API with adaptive prompt, retry, throttle | 15 tests |
-| generator.py | Markdown generation (summaries, digest, errors) | 22 tests |
+| summarizer.py | Gemini API with adaptive prompt, retry, throttle, quota handling | 29 tests |
+| generator.py | Markdown generation (summaries, digest, errors) + digest merge | 22 tests |
 | cleanup.py | Expire old content + state entries | 17 tests |
 | state.py | JSON state management (processed IDs) | 6 tests |
 | viewer.py | Static HTML/CSS/JS viewer generation | 7 tests |
@@ -134,91 +148,73 @@ Golden rule: summary never takes more than 10% of video length to read.
 | config.yaml | Source channels, categories, settings |
 | requirements.txt | Python dependencies |
 | state.json | Processed video IDs (auto-managed) |
-| .gitignore | Excludes .venv, __pycache__, etc. |
-| .github/workflows/morning-brief.yaml | GitHub Actions workflow |
-| mockups/option-a-editorial.html | UI mockup — editorial style |
-| mockups/option-b-cards.html | UI mockup — card style |
+| .gitignore | Excludes .venv, cookies.txt, .DS_Store, etc. |
+| .github/workflows/morning-brief.yaml | GitHub Actions workflow (runs 4am UTC daily) |
+| mockups/ | UI layout experiments |
 
 ## Known Issues
 
-1. **YouTube IP blocking** - Too many rapid requests triggers temporary IP ban. Mitigated by using phone hotspot or waiting. GitHub Actions IPs may also be blocked — may need proxy for production.
-2. **Gemini free tier quota** - 20 RPD, 5 RPM on gemini-2.5-flash. Old key (gemini-2.0-flash) shows limit:0. Use gemini-2.5-flash with the Default Gemini Project key.
-3. **Viewer requires HTTP server** - Browser blocks fetch() from file:// URLs. Must serve via `python -m http.server` locally or GitHub Pages in production.
-4. **Duration formatting** - Shows "3.0m 38.0s" instead of "3m 38s" (float formatting from yt-dlp).
+1. **Sam Witteveen transcript** — youtube-transcript-api fails on some videos from this channel on GitHub Actions IPs. Will retry on next run.
+2. **YouTube IP blocking** — Too many rapid requests triggers temporary IP ban. GitHub Actions IPs may be blocked — may need cookie auth for production.
+3. **Viewer requires HTTP server** — Browser blocks fetch() from file:// URLs. Use `python -m http.server` locally or GitHub Pages in production.
+4. **lookback_hours / max_videos** — Still set to dev values (168h, 1 video). Change to 26h / 3 videos for full production.
 
-## What's Done (Phase 1 MVP)
+## What's Done
 
 - [x] Config system (YAML with validation)
 - [x] YouTube video fetching (yt-dlp)
 - [x] YouTube transcript fetching (youtube-transcript-api)
 - [x] Gemini summarization with adaptive prompt
-- [x] Retry with exponential backoff for rate limits
+- [x] Robust error handling (RPM retry, RPD abort, auth fail, 5xx retry)
+- [x] Skip videos with no transcript
 - [x] Markdown generation (individual + daily digest)
+- [x] Digest merge (multiple runs per day don't overwrite)
 - [x] State management (skip already-processed videos)
 - [x] Content expiration/cleanup (7-day TTL)
-- [x] Static viewer with dark mode, mobile, TTS
-- [x] GitHub Actions workflow
-- [x] **219 unit tests passing**
-- [x] End-to-end local run successful (4 videos summarized today)
-- [x] Multi-language support (Spanish — CangrejoPistolero)
-- [x] Expanded to 4 channels across 3 categories
+- [x] Static viewer: dark mode, mobile, TTS, date pills, category filters
+- [x] GitHub Actions workflow (daily + manual trigger)
+- [x] GitHub Pages deployment (public site)
+- [x] Failure email notifications via GitHub settings
+- [x] 225 unit tests passing
+- [x] Multi-language support (Spanish)
+- [x] 5 channels across 3 categories
 
 ## Next Steps
 
-### Immediate (Deploy Phase 1)
-1. **Set production config** - Change lookback_hours to 26, max_videos_per_channel to 3
-2. **Add more YouTube channels** - Expand to 10-20 channels across all categories
-3. **Create GitHub repo** - Push code, add GEMINI_API_KEY secret
-4. **Enable GitHub Pages** - Serve output/ as static site
-5. **Test GitHub Actions** - Manual trigger, verify end-to-end
-6. **Fix duration formatting** - Clean up "3.0m 38.0s" to "3m 38s"
+### Immediate
+1. **Set production config** — Change lookback_hours to 26, max_videos_per_channel to 3
+2. **Add more channels** — Expand to 10-20 across all categories
+3. **Fix Sam Witteveen transcript** — Test cookie auth for GitHub Actions runners
 
-### Short-term Improvements
-7. **Optimize API calls** - Review YouTube + Gemini call patterns for reduction opportunities
-8. **YouTube IP resilience** - Add proxy support or cookie auth for GitHub Actions runners
-9. **Viewer UX** - Auto-expand summaries, improve mobile layout, add search
-10. **Error handling** - Better error messages in viewer, retry failed videos on next run
+### Short-term
+4. **Viewer UX** — Search, auto-expand, improve mobile
+5. **Error handling** — Surface error count on viewer UI
 
 ### Phase 2 - Spotify Podcasts
-11. Add Spotify podcast fetcher (RSS feeds or Spotify API)
-12. Adapt transcript extraction (podcast transcription service or Spotify's built-in)
-13. Add podcast-specific summary template (longer format, timeline of topics)
+6. Add Spotify podcast fetcher (RSS feeds or Spotify API)
+7. Podcast-specific summary template (longer format, topic timeline)
 
 ### Phase 3 - Web Pages
-14. Add web page fetcher (requests + BeautifulSoup or similar)
-15. Extract article text, strip boilerplate
-16. Summarize web articles with appropriate prompt
+8. Web page fetcher (requests + BeautifulSoup)
+9. Article text extraction, boilerplate stripping
 
-### Future Ideas
-- Email digest (daily summary sent to inbox)
+### Future
+- Email digest
 - Filtering/favorites in viewer
-- Summary quality scoring
-- Multi-language support (extend beyond Spanish)
 - Mobile app (PWA)
 
 ## How to Run
 
-### Local (manual)
+### Local
 ```bash
-cd /Users/nataly/Documents/VibeCoding/MorningBrief/Summarizer
-
-# Activate venv
 source .venv/bin/activate
-
-# Run pipeline
 unset GOOGLE_API_KEY && GEMINI_API_KEY=<your-key> python -m src.main --verbose
-
-# Dry run (fetch only, no API calls)
-python -m src.main --dry-run --verbose
-
-# View output
-python -m http.server 8000 -d output
-# Open http://localhost:8000
-
-# Run tests
-python -m pytest tests/ -v
+python -m src.main --dry-run --verbose   # no API calls
+python -m http.server 8000 -d output     # view at localhost:8000
+python -m pytest tests/ -v               # run tests
 ```
 
-### Automated (GitHub Actions)
-Runs daily at 4am UTC. Can also be triggered manually from the Actions tab.
-Requires `GEMINI_API_KEY` set as a repository secret.
+### Automated
+Runs daily at 4am UTC via GitHub Actions.
+Requires `GEMINI_API_KEY` repository secret.
+Site: https://ponatal-svg.github.io/Brief-summarizer/

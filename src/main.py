@@ -17,7 +17,7 @@ from src.generator import (
     generate_error_report,
 )
 from src.state import load_state, save_state, get_processed_ids
-from src.summarizer import create_client, summarize
+from src.summarizer import create_client, summarize, QuotaExhaustedError
 from src.viewer import generate_viewer
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,24 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                     duration_seconds=video.duration_seconds,
                     language=video.language,
                 )
+            except QuotaExhaustedError as e:
+                # Daily quota hit — save progress so far and abort cleanly
+                logger.error("Daily Gemini quota exhausted — saving progress and stopping early")
+                errors.append({"source": "Gemini/QuotaExhausted", "message": str(e)})
+                save_state(state_path, state)
+                generate_error_report(errors, output_dir, date_str)
+                generate_daily_digest(digest_entries, output_dir, date_str, config.categories)
+                generate_viewer(config, output_dir)
+                logger.info(f"Partial run saved: {len(digest_entries)} summaries before quota hit")
+                return
+            except Exception as e:
+                error_str = str(e).lower()
+                if "401" in str(e) or "403" in str(e) or "api_key_invalid" in error_str or "permission_denied" in error_str:
+                    # Auth failure — unrecoverable, fail the whole run so GitHub Actions shows red
+                    logger.error(f"UNRECOVERABLE: Gemini authentication failed — check GEMINI_API_KEY secret: {e}")
+                    errors.append({"source": "Gemini/AuthError", "message": str(e)})
+                    generate_error_report(errors, output_dir, date_str)
+                    sys.exit(1)
             except Exception as e:
                 msg = f"Summarization failed for '{video.title}': {e}"
                 logger.error(msg)

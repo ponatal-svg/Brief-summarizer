@@ -41,6 +41,11 @@ jobs:
           git diff --staged --quiet || git commit -m "Morning Brief update: $(date -u +%Y-%m-%d)"
           git push
 
+      - name: Report unrecoverable failure
+        if: failure()
+        run: |
+          echo "::error title=Morning Brief Failed::Pipeline failed on $(date -u +%Y-%m-%d). Check the logs above for details. Common causes: invalid/expired GEMINI_API_KEY, YouTube IP block, config error."
+
   deploy:
     needs: summarize
     runs-on: ubuntu-latest
