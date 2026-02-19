@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Brief — Header B: Compact top bar + source nav inline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --text: #111111;
+  --text-mid: #555555;
+  --text-light: #999999;
+  --border: #E5E5E5;
+  --hover: #F0EFED;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
+    --text-mid: #A8A6A0; --text-light: #6B6963;
+    --border: #333230; --hover: #2C2B28;
+  }
+}
+
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* ════════════════════════════════════════
+   HEADER B — Compact top bar
+   Idea: One slim full-width bar (title left, date right).
+   Below it: source nav is a horizontal row of source
+   "chips" — these replace both the old tabs AND the tiles.
+   The content area below shows the feed for whichever
+   chip is selected, with a summary card grid above
+   for the hub view.
+   ════════════════════════════════════════ */
+
+/* Single slim header bar */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.topbar-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+}
+.topbar-date {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+}
+.topbar-spacer { flex: 1; }
+.topbar-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  background: var(--hover);
+  padding: 3px 9px;
+  border-radius: 4px;
+}
+
+/* Source nav — a single row that replaces both tabs and tiles */
+.source-nav {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.source-nav-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+.source-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.12s ease;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-mid);
+  position: relative;
+  bottom: -1px;
+  white-space: nowrap;
+}
+.source-nav-item:hover { color: var(--text); }
+.source-nav-item.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+.source-nav-item.muted { color: var(--text-light); }
+.source-nav-item.muted:hover { color: var(--text-light); cursor: default; }
+.source-nav-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+}
+.source-nav-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  background: var(--hover);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.source-nav-phase {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-light);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.container { max-width: 1000px; margin: 0 auto; padding: 0 32px; }
+
+/* ── Hub view: compact stat cards ── */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 28px 0 32px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.stat-card:hover {
+  border-color: var(--text-light);
+  box-shadow: 0 1px 8px rgba(0,0,0,0.05);
+}
+.stat-card.muted { opacity: 0.45; cursor: default; }
+.stat-card:hover.muted { border-color: var(--border); box-shadow: none; }
+.stat-card-row1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.stat-card-icon { font-size: 14px; }
+.stat-card-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1;
+}
+.stat-card-label {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.stat-card-detail {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* ── Recent feed ── */
+.section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+.recent-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: padding 0.1s ease;
+}
+.recent-item:hover { padding-left: 4px; }
+.recent-item:last-child { border-bottom: none; }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.recent-body { flex: 1; min-width: 0; }
+.recent-title {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  line-height: 1.35;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-meta { font-size: 12px; color: var(--text-light); }
+.recent-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  background: var(--hover);
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.annotation {
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  margin: 32px 0 16px;
+}
+.annotation strong { color: var(--text-mid); }
+
+@media (max-width: 640px) {
+  .container { padding: 0 16px; }
+  .topbar-inner, .source-nav-inner { padding: 0 16px; }
+  .stat-row { grid-template-columns: 1fr; }
+  .source-nav-item { padding: 10px 12px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER B ══════════════════════════════
+     Slim top bar (title + date).
+     Source nav is an underline-tab row with counts.
+     No separate tiles — nav IS the source overview.
+     ═════════════════════════════════════════ -->
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-title">Morning Brief</div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-date">Thu, Feb 19 2026</div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-count">4 items</div>
+  </div>
+</div>
+
+<!-- Source nav: single row, underline active state -->
+<div class="source-nav">
+  <div class="source-nav-inner">
+
+    <div class="source-nav-item active">
+      <span class="source-nav-dot" style="background:#888"></span>
+      Overview
+    </div>
+
+    <div class="source-nav-item">
+      <span class="source-nav-dot" style="background:#E63946"></span>
+      YouTube
+      <span class="source-nav-count">4</span>
+    </div>
+
+    <div class="source-nav-item muted">
+      <span class="source-nav-dot" style="background:#9B59B6; opacity:0.4"></span>
+      Podcasts
+      <span class="source-nav-phase">P2</span>
+    </div>
+
+    <div class="source-nav-item muted">
+      <span class="source-nav-dot" style="background:#E67E22; opacity:0.4"></span>
+      Web &amp; News
+      <span class="source-nav-phase">P3</span>
+    </div>
+
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Compact stat cards (summary of each source) -->
+  <div class="stat-row">
+
+    <div class="stat-card">
+      <div class="stat-card-row1">
+        <span class="stat-card-icon">▶</span>
+        <span class="stat-card-num">4</span>
+      </div>
+      <div class="stat-card-label">YouTube</div>
+      <div class="stat-card-detail">6 channels · AI · Health · Humanities</div>
+    </div>
+
+    <div class="stat-card muted">
+      <div class="stat-card-row1">
+        <span class="stat-card-icon">🎙</span>
+        <span class="stat-card-num" style="font-size:13px; color:var(--text-light)">—</span>
+      </div>
+      <div class="stat-card-label">Podcasts</div>
+      <div class="stat-card-detail">Phase 2 · not yet configured</div>
+    </div>
+
+    <div class="stat-card muted">
+      <div class="stat-card-row1">
+        <span class="stat-card-icon">🌐</span>
+        <span class="stat-card-num" style="font-size:13px; color:var(--text-light)">—</span>
+      </div>
+      <div class="stat-card-label">Web &amp; News</div>
+      <div class="stat-card-detail">Phase 3 · not yet configured</div>
+    </div>
+
+  </div>
+
+  <!-- Recent feed -->
+  <div class="section-label">Today · all sources</div>
+
+  <div class="recent-item">
+    <div class="dot" style="background:#E63946"></div>
+    <div class="recent-body">
+      <div class="recent-title">The Two Best AI Models Just Got Released Simultaneously</div>
+      <div class="recent-meta">AI Explained · 14m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot" style="background:#E63946"></div>
+    <div class="recent-body">
+      <div class="recent-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
+      <div class="recent-meta">Nate B Jones · 22m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot" style="background:#27AE60"></div>
+    <div class="recent-body">
+      <div class="recent-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
+      <div class="recent-meta">Dr. Stacy Sims · 18m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot" style="background:#D4A574"></div>
+    <div class="recent-body">
+      <div class="recent-title">The BIGGEST SCAM in MODERN ART</div>
+      <div class="recent-meta">CangrejoPistolero · 31m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+
+  <div class="annotation">
+    <strong>Header B — Slim top bar + underline source nav.</strong>
+    Top bar is a neutral chrome strip (like Notion / Linear). Source nav row uses underline active state — standard web pattern, instantly readable. No tiles at all — stat cards are purely informational. The source nav row + stat cards together answer "what's available and how much" at a glance.
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Brief — UX Review (all pages)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!--
+  ═══════════════════════════════════════════════════════════════
+  MORNING BRIEF — FULL UX REVIEW DOCUMENT
+  Three pages rendered sequentially for design critique.
+
+  NAVIGATION FLOW:
+    Page 1 → Landing / Hub  (v2-header-C)
+      Clicking YouTube tile → Page 2
+      Clicking Podcasts tile → Page 3
+
+    Page 2 → YouTube detail  (index.html)
+      ← back link → Page 1
+
+    Page 3 → Podcasts detail  (podcasts.html)
+      ← back link → Page 1
+
+  DESIGN SYSTEM:
+    Fonts:   DM Sans (UI) + JetBrains Mono (labels/metadata)
+    Palette: #F7F7F5 bg · #FFFFFF surface · #111111 text
+             #555555 text-mid · #999999 text-light
+             #E5E5E5 border · #F0EFED hover
+    Dark mode: supported via prefers-color-scheme
+    Breakpoint: 640px (mobile)
+
+  CONTENT SOURCES (currently):
+    YouTube  — 6 channels: AI Explained, Nate B Jones, Sam Witteveen,
+                Cold Fusion (AI); Dr. Stacy Sims (Health);
+                CangrejoPistolero (Humanities/es)
+    Podcasts — mock data: Lex Fridman, Huberman Lab, How I Built This
+    Web/News — Phase 3, not yet built
+
+  PIPELINE:
+    Python · yt-dlp · youtube-transcript-api · Gemini 2.5 Flash
+    GitHub Actions cron (2am PST / 10am UTC) · GitHub Pages
+  ═══════════════════════════════════════════════════════════════
+-->
+
+<style>
+/* ── Shared design system ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F7F7F5; --surface: #FFFFFF;
+  --text: #111111; --text-mid: #555555; --text-light: #999999;
+  --border: #E5E5E5; --hover: #F0EFED;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
+    --text-mid: #A8A6A0; --text-light: #6B6963;
+    --border: #333230; --hover: #2C2B28;
+  }
+}
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Page separator ── */
+.page-break {
+  max-width: 1000px;
+  margin: 0 auto 0;
+  padding: 0 32px;
+}
+.page-break-inner {
+  border-top: 2px dashed var(--border);
+  padding: 24px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.page-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.page-label strong { color: var(--text-mid); }
+.page-break-line { flex: 1; height: 1px; background: var(--border); }
+.page-spacer { height: 48px; }
+
+/* ════════════════════════════════════════
+   PAGE 1 — LANDING / HUB
+   ════════════════════════════════════════ */
+.p1-header {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 32px 28px;
+}
+.p1-date-big {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  margin-bottom: 4px;
+}
+.p1-app {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.p1-app strong { font-weight: 600; }
+
+.p1-container { max-width: 1000px; margin: 0 auto; padding: 0 32px; }
+
+.source-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 36px;
+}
+.stile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 18px 14px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.stile::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: background 0.12s ease;
+  border-radius: 10px 0 0 10px;
+}
+.stile.yt::before  { background: #E63946; }
+.stile.pod::before { background: #9B59B6; }
+.stile.muted { opacity: 0.5; cursor: default; }
+.stile-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.stile-icon { font-size: 16px; }
+.stile-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.stile-status.live { background: var(--text); color: var(--bg); }
+.stile-status.soon { background: var(--hover); color: var(--text-light); }
+.stile-name { font-size: 14px; font-weight: 600; letter-spacing: -0.1px; margin-bottom: 1px; }
+.stile.muted .stile-name { color: var(--text-light); font-weight: 400; }
+.stile-sub { font-size: 12px; color: var(--text-light); margin-bottom: 10px; }
+.stile-preview {
+  font-size: 12px; color: var(--text-mid); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  border-top: 1px solid var(--border); padding-top: 10px;
+}
+.stile.muted .stile-preview { font-style: italic; color: var(--text-light); }
+.stile-cta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-light); margin-top: 6px; }
+
+.date-strip { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
+.date-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  padding: 4px 11px; border-radius: 4px;
+  border: 1px solid var(--border); cursor: pointer; color: var(--text-mid);
+  transition: all 0.12s ease; background: transparent;
+}
+.date-chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--text-light); margin-bottom: 12px;
+}
+.recent-item {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.recent-item:last-child { border-bottom: none; }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); flex-shrink: 0; margin-top: 7px; }
+.recent-body { flex: 1; min-width: 0; }
+.recent-title {
+  font-size: 15px; font-weight: 500; letter-spacing: -0.1px;
+  line-height: 1.35; margin-bottom: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.recent-meta { font-size: 12px; color: var(--text-light); }
+.recent-tag {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--text-light); background: var(--hover);
+  padding: 2px 6px; border-radius: 3px; flex-shrink: 0; align-self: center;
+}
+
+/* ════════════════════════════════════════
+   PAGES 2 & 3 — SHARED DETAIL STYLES
+   (YouTube + Podcasts use same layout)
+   ════════════════════════════════════════ */
+.detail-header {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 32px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.back-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; font-weight: 400;
+  color: var(--text-light); text-decoration: none; flex-shrink: 0;
+}
+.detail-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; flex-shrink: 0; }
+.detail-header h1 span { font-weight: 300; color: var(--text-light); margin-left: 4px; }
+.detail-date-pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.date-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  padding: 5px 12px; border-radius: 4px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-mid); cursor: pointer; transition: all 0.15s ease;
+}
+.date-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+.detail-toolbar {
+  max-width: 1000px; margin: 0 auto; padding: 14px 32px 0;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
+}
+.detail-toolbar-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.filter-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 500; padding: 5px 14px;
+  border-radius: 4px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-mid);
+  cursor: pointer; transition: all 0.15s ease; text-transform: lowercase;
+}
+.filter-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+.expand-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 500; padding: 5px 14px;
+  border-radius: 4px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-light);
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+}
+.expand-btn .arrow { font-size: 13px; }
+
+.detail-divider { max-width: 1000px; margin: 16px auto 0; padding: 0 32px; }
+.detail-divider hr { border: none; height: 1px; background: var(--border); }
+.detail-count {
+  max-width: 1000px; margin: 0 auto; padding: 12px 32px 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-light);
+}
+
+/* Cards */
+.detail-cards { max-width: 1000px; margin: 0 auto; padding: 0 32px 60px; }
+.card {
+  display: grid; grid-template-columns: 4px 1fr;
+  gap: 0; padding: 28px 0; border-bottom: 1px solid var(--border);
+}
+.card:last-child { border-bottom: none; }
+.card-accent { border-radius: 2px; }
+.card-body { padding-left: 20px; }
+.card-show { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.card-artwork {
+  width: 40px; height: 40px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--hover);
+  flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 18px;
+}
+.card-show-name { font-size: 12px; font-weight: 600; color: var(--text-mid); line-height: 1.2; }
+.card-show-detail { font-size: 11px; color: var(--text-light); }
+.card-tag {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  background: var(--hover); padding: 2px 8px; border-radius: 3px;
+  display: inline-block; margin-bottom: 8px; color: var(--text-mid);
+}
+.card-title { font-size: 19px; font-weight: 600; letter-spacing: -0.2px; line-height: 1.35; margin-bottom: 6px; }
+.card-source { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-light); margin-bottom: 10px; }
+.card-hook { font-size: 14px; color: var(--text-mid); line-height: 1.6; margin-bottom: 12px; }
+.card-findings-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-light); margin-bottom: 10px;
+}
+.finding { display: flex; gap: 12px; margin-bottom: 8px; font-size: 14px; line-height: 1.6; color: var(--text-mid); }
+.finding-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-light); flex-shrink: 0; min-width: 20px; margin-top: 3px; }
+.so-what-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-light); margin: 14px 0 6px;
+}
+.so-what { font-size: 14px; color: var(--text-mid); line-height: 1.7; }
+.card-tts {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+.tts-btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  padding: 3px 8px; border-radius: 3px; border: 1px solid var(--border);
+  cursor: pointer; color: var(--text-light); background: transparent;
+}
+.tts-listen { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-light); cursor: pointer; }
+.tts-spacer { flex: 1; }
+.card-expand { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-light); cursor: pointer; }
+
+@media (max-width: 640px) {
+  .source-tiles { grid-template-columns: 1fr; }
+  .p1-container, .p1-header { padding-left: 16px; padding-right: 16px; }
+  .detail-header, .detail-toolbar, .detail-divider, .detail-count, .detail-cards { padding-left: 16px; padding-right: 16px; }
+  .card-title { font-size: 17px; }
+  .detail-header { flex-direction: column; gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 1 — LANDING / HUB
+     Entry point. Three source-type tiles as nav.
+     Unified recent feed below.
+     ═══════════════════════════════════════════ -->
+
+<div class="page-break" style="margin-top:32px">
+  <div class="page-break-inner">
+    <span class="page-label"><strong>Page 1</strong> — Landing / Hub</span>
+    <div class="page-break-line"></div>
+    <span class="page-label">Entry point · tiles = navigation</span>
+  </div>
+</div>
+
+<div class="p1-header">
+  <div class="p1-date-big">Thursday · Feb 19 2026</div>
+  <div class="p1-app"><strong>Morning</strong> Brief</div>
+</div>
+
+<div class="p1-container">
+  <div class="source-tiles">
+
+    <div class="stile yt">
+      <div class="stile-row1">
+        <span class="stile-icon">▶</span>
+        <span class="stile-status live">4 new</span>
+      </div>
+      <div class="stile-name">YouTube</div>
+      <div class="stile-sub">6 channels · AI · Health · Humanities</div>
+      <div class="stile-preview">The Two Best AI Models Just Got Released Simultaneously</div>
+      <div class="stile-cta">View all →</div>
+    </div>
+
+    <div class="stile pod">
+      <div class="stile-row1">
+        <span class="stile-icon">🎙</span>
+        <span class="stile-status live">3 new</span>
+      </div>
+      <div class="stile-name">Podcasts</div>
+      <div class="stile-sub">3 shows · Tech · Health · Business</div>
+      <div class="stile-preview">Lex Fridman — Sam Altman on the Future of AGI</div>
+      <div class="stile-cta">View all →</div>
+    </div>
+
+    <div class="stile muted">
+      <div class="stile-row1">
+        <span class="stile-icon">🌐</span>
+        <span class="stile-status soon">Phase 3</span>
+      </div>
+      <div class="stile-name">Web &amp; News</div>
+      <div class="stile-sub">Tracked pages &amp; articles</div>
+      <div class="stile-preview">Not yet configured</div>
+    </div>
+
+  </div>
+
+  <div class="date-strip">
+    <span class="date-chip active">Feb 19</span>
+    <span class="date-chip">Feb 18</span>
+    <span class="date-chip">Feb 17</span>
+    <span class="date-chip">Feb 16</span>
+  </div>
+
+  <div class="section-label">All sources · today</div>
+
+  <div class="recent-item">
+    <div class="dot"></div>
+    <div class="recent-body">
+      <div class="recent-title">The Two Best AI Models Just Got Released Simultaneously</div>
+      <div class="recent-meta">AI Explained · 14m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot"></div>
+    <div class="recent-body">
+      <div class="recent-title">Sam Altman on the Future of AGI, OpenAI's Roadmap &amp; What Scares Him</div>
+      <div class="recent-meta">Lex Fridman · 2h 14m · Feb 19</div>
+    </div>
+    <div class="recent-tag">podcast</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot"></div>
+    <div class="recent-body">
+      <div class="recent-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
+      <div class="recent-meta">Nate B Jones · 22m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot"></div>
+    <div class="recent-body">
+      <div class="recent-title">Why Sleep Is the Best Performance Drug You're Not Taking Seriously</div>
+      <div class="recent-meta">Huberman Lab · 1h 48m · Feb 19</div>
+    </div>
+    <div class="recent-tag">podcast</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot"></div>
+    <div class="recent-body">
+      <div class="recent-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
+      <div class="recent-meta">Dr. Stacy Sims · 18m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot"></div>
+    <div class="recent-body">
+      <div class="recent-title">The BIGGEST SCAM in MODERN ART</div>
+      <div class="recent-meta">CangrejoPistolero · 31m · Feb 18</div>
+    </div>
+    <div class="recent-tag">youtube</div>
+  </div>
+  <div class="recent-item">
+    <div class="dot"></div>
+    <div class="recent-body">
+      <div class="recent-title">The Startup That Beat Google at Search — What We Can Learn</div>
+      <div class="recent-meta">How I Built This · 52m · Feb 19</div>
+    </div>
+    <div class="recent-tag">podcast</div>
+  </div>
+</div>
+
+<div class="page-spacer"></div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 2 — YOUTUBE DETAIL
+     Reached by clicking the YouTube tile.
+     ← returns to Page 1.
+     ═══════════════════════════════════════════ -->
+
+<div class="page-break">
+  <div class="page-break-inner">
+    <span class="page-label"><strong>Page 2</strong> — YouTube Detail</span>
+    <div class="page-break-line"></div>
+    <span class="page-label">← back to Page 1 · date pills in header · category filters in toolbar</span>
+  </div>
+</div>
+
+<header class="detail-header">
+  <a class="back-link" href="#">←</a>
+  <h1>Morning Brief<span>/ youtube</span></h1>
+  <div class="detail-date-pills">
+    <button class="date-btn active">Feb 19</button>
+    <button class="date-btn">Feb 18</button>
+    <button class="date-btn">Feb 17</button>
+  </div>
+</header>
+
+<div class="detail-toolbar">
+  <div class="detail-toolbar-left">
+    <button class="filter-btn active">all</button>
+    <button class="filter-btn">ai</button>
+    <button class="filter-btn">health</button>
+    <button class="filter-btn">humanities</button>
+  </div>
+  <button class="expand-btn"><span class="arrow">→</span> expand all</button>
+</div>
+<div class="detail-divider"><hr></div>
+<div class="detail-count">4 summaries</div>
+
+<div class="detail-cards">
+
+  <div class="card">
+    <div class="card-accent" style="background:#4A90D9"></div>
+    <div class="card-body">
+      <span class="card-tag">AI</span>
+      <div class="card-title">The Two Best AI Models Just Got Released Simultaneously</div>
+      <div class="card-source">AI Explained · 14m · Feb 18, 2026</div>
+      <div class="card-hook">Two frontier labs dropped major model updates on the same day — this breakdown compares capabilities head-to-head and explains what it means for the state of the field.</div>
+      <div class="card-findings-label">Key Findings</div>
+      <div class="finding"><span class="finding-num">01</span><span>Both models show significant reasoning improvements over their predecessors, particularly on math and coding benchmarks.</span></div>
+      <div class="finding"><span class="finding-num">02</span><span>One model leads on speed and cost; the other on complex multi-step reasoning — different use cases, not a clear winner.</span></div>
+      <div class="finding"><span class="finding-num">03</span><span>The simultaneous release appears strategic — neither company wanted the other to own the "best model" narrative alone.</span></div>
+      <div class="so-what-label">So what</div>
+      <div class="so-what">If you're building on top of either API, now is the time to benchmark both on your actual workload — the gap has narrowed and the cost differences are meaningful.</div>
+      <div class="card-tts">
+        <span class="tts-listen">▶ Listen</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-btn">1.0×</span>
+        <span class="tts-btn">1.2×</span>
+        <span class="tts-btn">1.5×</span>
+        <span class="tts-btn">2.0×</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#4A90D9"></div>
+    <div class="card-body">
+      <span class="card-tag">AI</span>
+      <div class="card-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
+      <div class="card-source">Nate B Jones · 22m · Feb 18, 2026</div>
+      <div class="card-hook">A practical framework for AI-assisted coding and why the jump from level 2 to 3 is where most developers stall out.</div>
+      <div class="card-tts" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center;">
+        <span class="card-expand">↓ Expand</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-listen">▶ Listen</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#27AE60"></div>
+    <div class="card-body">
+      <span class="card-tag">Health</span>
+      <div class="card-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
+      <div class="card-source">Dr. Stacy Sims · 18m · Feb 18, 2026</div>
+      <div class="card-hook">Yoga has real benefits, but research shows it's insufficient for maintaining muscle mass and bone density, especially post-menopause.</div>
+      <div class="card-tts" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center;">
+        <span class="card-expand">↓ Expand</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-listen">▶ Listen</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#D4A574"></div>
+    <div class="card-body">
+      <span class="card-tag">Humanities</span>
+      <div class="card-title">The BIGGEST SCAM in MODERN ART</div>
+      <div class="card-source">CangrejoPistolero · 31m · Feb 18, 2026</div>
+      <div class="card-hook">Un análisis de cómo el mercado del arte contemporáneo convirtió obras de valor cuestionable en inversiones de millones de dólares.</div>
+      <div class="card-tts" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center;">
+        <span class="card-expand">↓ Expand</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-listen">▶ Listen</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="page-spacer"></div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 3 — PODCASTS DETAIL
+     Reached by clicking the Podcasts tile.
+     ← returns to Page 1.
+     Podcast-specific addition: show artwork + episode info above card tag.
+     ═══════════════════════════════════════════ -->
+
+<div class="page-break">
+  <div class="page-break-inner">
+    <span class="page-label"><strong>Page 3</strong> — Podcasts Detail</span>
+    <div class="page-break-line"></div>
+    <span class="page-label">← back to Page 1 · same layout as YouTube · adds show artwork + episode row</span>
+  </div>
+</div>
+
+<header class="detail-header">
+  <a class="back-link" href="#">←</a>
+  <h1>Morning Brief<span>/ podcasts</span></h1>
+  <div class="detail-date-pills">
+    <button class="date-btn active">Feb 19</button>
+    <button class="date-btn">Feb 18</button>
+    <button class="date-btn">Feb 17</button>
+  </div>
+</header>
+
+<div class="detail-toolbar">
+  <div class="detail-toolbar-left">
+    <button class="filter-btn active">all</button>
+    <button class="filter-btn">tech</button>
+    <button class="filter-btn">health</button>
+    <button class="filter-btn">business</button>
+  </div>
+  <button class="expand-btn"><span class="arrow">→</span> expand all</button>
+</div>
+<div class="detail-divider"><hr></div>
+<div class="detail-count">3 summaries</div>
+
+<div class="detail-cards">
+
+  <div class="card">
+    <div class="card-accent" style="background:#4A90D9"></div>
+    <div class="card-body">
+      <div class="card-show">
+        <div class="card-artwork">🎙</div>
+        <div>
+          <div class="card-show-name">Lex Fridman Podcast</div>
+          <div class="card-show-detail">Episode #452 · Feb 19, 2026</div>
+        </div>
+      </div>
+      <span class="card-tag">Tech</span>
+      <div class="card-title">Sam Altman on the Future of AGI, OpenAI's Roadmap &amp; What Scares Him</div>
+      <div class="card-source">2h 14m · spotify</div>
+      <div class="card-hook">A rare long-form conversation where Altman is unusually candid — on timelines, on what keeps him up at night, and on why he thinks the transition to AGI matters more than any product OpenAI will ship.</div>
+      <div class="card-findings-label">Key Findings</div>
+      <div class="finding"><span class="finding-num">01</span><span>Altman believes AGI is achievable within this decade and that OpenAI is "closer than most people think" — but refuses to give a year.</span></div>
+      <div class="finding"><span class="finding-num">02</span><span>He frames the biggest risk not as misalignment but as concentration of power — including OpenAI itself having too much control.</span></div>
+      <div class="finding"><span class="finding-num">03</span><span>On o-series reasoning models: "We didn't fully understand why they worked until after they shipped."</span></div>
+      <div class="finding"><span class="finding-num">04</span><span>Discussed departure of key safety researchers — says culture is "strong" but acknowledges "reasonable people disagree."</span></div>
+      <div class="card-tts">
+        <span class="tts-listen">▶ Listen</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-btn">1.0×</span>
+        <span class="tts-btn">1.2×</span>
+        <span class="tts-btn">1.5×</span>
+        <span class="tts-btn">2.0×</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#27AE60"></div>
+    <div class="card-body">
+      <div class="card-show">
+        <div class="card-artwork">🧠</div>
+        <div>
+          <div class="card-show-name">Huberman Lab</div>
+          <div class="card-show-detail">Episode #231 · Feb 19, 2026</div>
+        </div>
+      </div>
+      <span class="card-tag">Health</span>
+      <div class="card-title">Why Sleep Is the Best Performance Drug You're Not Taking Seriously</div>
+      <div class="card-source">1h 48m · spotify</div>
+      <div class="card-hook">Huberman and Matthew Walker revisit the science of sleep with new research — REM deprivation, emotional regulation, memory consolidation, and metabolic health.</div>
+      <div class="card-tts" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center;">
+        <span class="card-expand">↓ Expand</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-listen">▶ Listen</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#E67E22"></div>
+    <div class="card-body">
+      <div class="card-show">
+        <div class="card-artwork">🏗</div>
+        <div>
+          <div class="card-show-name">How I Built This</div>
+          <div class="card-show-detail">Feb 19, 2026</div>
+        </div>
+      </div>
+      <span class="card-tag">Business</span>
+      <div class="card-title">The Startup That Beat Google at Search — What We Can Learn</div>
+      <div class="card-source">52m · rss</div>
+      <div class="card-hook">Guy Raz interviews the Perplexity AI founder on how a tiny team built a product that millions use instead of Google — and the counterintuitive product decisions that got them there.</div>
+      <div class="card-tts" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center;">
+        <span class="card-expand">↓ Expand</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-listen">▶ Listen</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

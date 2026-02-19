@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Brief — Option 3: Split View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --text: #111111;
+  --text-mid: #555555;
+  --text-light: #999999;
+  --border: #E5E5E5;
+  --hover: #F0EFED;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
+    --text-mid: #A8A6A0; --text-light: #6B6963;
+    --border: #333230; --hover: #2C2B28;
+  }
+}
+
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ──────────────────────────────────────────
+   LANDING PAGE DESIGN
+   Full-width, three panels side by side
+   ────────────────────────────────────────── */
+
+.landing-header {
+  padding: 40px 32px 32px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.landing-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin-bottom: 4px;
+}
+.landing-title span { font-weight: 300; color: var(--text-mid); }
+.landing-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* ── Three-panel grid ── */
+.panels {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.panel {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+  transition: background 0.15s ease;
+}
+.panel:hover { background: var(--surface); }
+
+.panel-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.panel-icon {
+  font-size: 14px;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.panel-type-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+.panel-count {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  background: var(--hover);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+.panel-channels {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+/* ── Panel items list ── */
+.panel-items { flex: 1; padding: 0; }
+.panel-item {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.panel-item:last-child { border-bottom: none; }
+.panel-item:hover { background: var(--hover); }
+.panel-item-cat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.panel-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.1px;
+  margin-bottom: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.panel-item-meta {
+  font-size: 11px;
+  color: var(--text-light);
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.panel-item-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Coming soon panel ── */
+.panel-coming {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 20px;
+  color: var(--text-light);
+  text-align: center;
+}
+.panel-coming-icon { font-size: 28px; opacity: 0.4; }
+.panel-coming-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  border-radius: 12px;
+  color: var(--text-light);
+}
+.panel-coming-desc {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+/* ── Panel footer CTA ── */
+.panel-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-light);
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.panel-footer:hover { background: var(--hover); color: var(--text); }
+
+/* ──────────────────────────────────────────
+   PAGE SEPARATOR
+   ────────────────────────────────────────── */
+.page-sep {
+  margin: 48px 0 32px;
+  border: none;
+  border-top: 2px dashed var(--border);
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+}
+.page-sep::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  padding: 0 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+/* ──────────────────────────────────────────
+   DETAIL PAGE (YouTube) — same as today's viewer
+   ────────────────────────────────────────── */
+
+.detail-header {
+  padding: 32px 32px 0;
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.back-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: color 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.back-link:hover { color: var(--text); }
+.detail-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.detail-title span { font-weight: 300; color: var(--text-mid); }
+.detail-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.toolbar {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: transparent;
+  color: var(--text-mid);
+}
+.pill:hover { color: var(--text); background: var(--hover); }
+.pill.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.toolbar-spacer { flex: 1; }
+
+.cards {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.card {
+  border-bottom: 1px solid var(--border);
+  padding: 28px 0;
+  display: flex;
+  gap: 12px;
+}
+.card-accent {
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 60px;
+}
+.card-body { flex: 1; min-width: 0; }
+.card-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--hover);
+  padding: 2px 8px;
+  border-radius: 3px;
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--text-mid);
+}
+.card-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+.card-source {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+}
+.card-hook {
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+
+/* ── Annotation ── */
+.annotation {
+  max-width: 1000px;
+  margin: 16px auto;
+  padding: 10px 32px;
+  background: var(--hover);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  margin-left: 32px;
+  margin-right: 32px;
+}
+.annotation strong { color: var(--text-mid); }
+
+/* ── Responsive ── */
+@media (max-width: 720px) {
+  .landing-header, .detail-header { padding-left: 16px; padding-right: 16px; }
+  .panels { padding: 0 16px; grid-template-columns: 1fr; }
+  .toolbar, .cards { padding-left: 16px; padding-right: 16px; }
+  .annotation { margin-left: 16px; margin-right: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     PAGE 1 — LANDING (3-panel split)
+     ══════════════════════════════════════════ -->
+
+<div class="landing-header">
+  <div class="landing-title">Morning Brief <span>/ today</span></div>
+  <div class="landing-sub">Thursday, Feb 19 · 4 items across 1 source</div>
+</div>
+
+<div class="panels">
+
+  <!-- ── YouTube panel ── -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-type-row">
+        <div class="panel-icon" style="color:#E63946">▶</div>
+        <div class="panel-type-name">YouTube</div>
+        <div class="panel-count">3 new</div>
+      </div>
+      <div class="panel-channels">6 channels · AI · Health · Humanities</div>
+    </div>
+
+    <div class="panel-items">
+      <div class="panel-item">
+        <div class="panel-item-cat" style="color:#4A90D9">AI</div>
+        <div class="panel-item-title">The Two Best AI Models Just Got Released Simultaneously</div>
+        <div class="panel-item-meta">
+          <div class="panel-item-dot" style="background:#4A90D9"></div>
+          AI Explained · 14m
+        </div>
+      </div>
+      <div class="panel-item">
+        <div class="panel-item-cat" style="color:#4A90D9">AI</div>
+        <div class="panel-item-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
+        <div class="panel-item-meta">
+          <div class="panel-item-dot" style="background:#4A90D9"></div>
+          Nate B Jones · 22m
+        </div>
+      </div>
+      <div class="panel-item">
+        <div class="panel-item-cat" style="color:#27AE60">Health</div>
+        <div class="panel-item-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
+        <div class="panel-item-meta">
+          <div class="panel-item-dot" style="background:#27AE60"></div>
+          Dr. Stacy Sims · 18m
+        </div>
+      </div>
+      <div class="panel-item">
+        <div class="panel-item-cat" style="color:#D4A574">Humanities</div>
+        <div class="panel-item-title">The BIGGEST SCAM in MODERN ART</div>
+        <div class="panel-item-meta">
+          <div class="panel-item-dot" style="background:#D4A574"></div>
+          CangrejoPistolero · 31m
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-footer">
+      View all 4 videos &nbsp; →
+    </div>
+  </div>
+
+  <!-- ── Podcasts panel (coming soon) ── -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-type-row">
+        <div class="panel-icon">🎙</div>
+        <div class="panel-type-name" style="color:var(--text-light)">Podcasts</div>
+      </div>
+      <div class="panel-channels" style="opacity:0.5">Spotify &amp; RSS · coming in Phase 2</div>
+    </div>
+
+    <div class="panel-coming">
+      <div class="panel-coming-icon">🎙</div>
+      <div class="panel-coming-badge">Phase 2</div>
+      <div class="panel-coming-desc">Podcast transcripts &amp; summaries — longer-form topics, speaker attribution, episode timelines</div>
+    </div>
+
+    <div class="panel-footer" style="opacity:0.4; cursor:default">
+      Not yet configured
+    </div>
+  </div>
+
+  <!-- ── Web & News panel (coming soon) ── -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-type-row">
+        <div class="panel-icon">🌐</div>
+        <div class="panel-type-name" style="color:var(--text-light)">Web &amp; News</div>
+      </div>
+      <div class="panel-channels" style="opacity:0.5">Tracked pages &amp; articles · coming in Phase 3</div>
+    </div>
+
+    <div class="panel-coming">
+      <div class="panel-coming-icon">🌐</div>
+      <div class="panel-coming-badge">Phase 3</div>
+      <div class="panel-coming-desc">Article summaries from tracked websites, newsletters &amp; news sources — boilerplate-stripped, key facts only</div>
+    </div>
+
+    <div class="panel-footer" style="opacity:0.4; cursor:default">
+      Not yet configured
+    </div>
+  </div>
+
+</div>
+
+<hr class="page-sep" data-label="↓ scroll to see YouTube detail page (click 'View all 4 videos →')">
+
+<!-- ══════════════════════════════════════════
+     PAGE 2 — YOUTUBE DETAIL
+     ══════════════════════════════════════════ -->
+
+<div class="detail-header">
+  <span class="back-link">← Back</span>
+  <div class="detail-title">Morning Brief <span>/ youtube</span></div>
+  <div class="detail-sub">Thu Feb 19 · 4 videos</div>
+</div>
+
+<div class="toolbar">
+  <span class="pill active">Feb 19</span>
+  <span class="pill">Feb 18</span>
+  <span class="pill">Feb 17</span>
+  <div class="toolbar-spacer"></div>
+  <span class="pill active">All</span>
+  <span class="pill">AI</span>
+  <span class="pill">Health</span>
+  <span class="pill">Humanities</span>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <div class="card-accent" style="background:#4A90D9"></div>
+    <div class="card-body">
+      <span class="card-tag">AI</span>
+      <div class="card-title">The Two Best AI Models Just Got Released Simultaneously</div>
+      <div class="card-source">AI Explained · 14m · Feb 18, 2026</div>
+      <div class="card-hook">Two frontier labs dropped major model updates on the same day. This breakdown compares their capabilities head-to-head and explains what it means for the field.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#4A90D9"></div>
+    <div class="card-body">
+      <span class="card-tag">AI</span>
+      <div class="card-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
+      <div class="card-source">Nate B Jones · 22m · Feb 18, 2026</div>
+      <div class="card-hook">A practical framework for AI-assisted coding and why the jump from level 2 to 3 is where most developers stall out.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#27AE60"></div>
+    <div class="card-body">
+      <span class="card-tag">Health</span>
+      <div class="card-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
+      <div class="card-source">Dr. Stacy Sims · 18m · Feb 18, 2026</div>
+      <div class="card-hook">Yoga has real benefits, but research shows it's insufficient for maintaining muscle mass and bone density, especially post-menopause.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent" style="background:#D4A574"></div>
+    <div class="card-body">
+      <span class="card-tag">Humanities</span>
+      <div class="card-title">The BIGGEST SCAM in MODERN ART</div>
+      <div class="card-source">CangrejoPistolero · 31m · Feb 18, 2026</div>
+      <div class="card-hook">Un análisis de cómo el mercado del arte contemporáneo convirtió obras de valor cuestionable en inversiones de millones de dólares.</div>
+    </div>
+  </div>
+</div>
+
+<div class="annotation">
+  <strong>Option 3 — Split View.</strong>
+  Landing page shows three panels side-by-side — one per source type. Each panel has a title list + "View all →" footer. Phase 2/3 panels are present but greyed out, showing the architecture without clutter. Clicking a panel goes to the full-width detail page (same as today's viewer, with a ← Back link).
+</div>
+
+</body>
+</html>

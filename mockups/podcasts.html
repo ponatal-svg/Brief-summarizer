@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Brief · Podcasts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --text: #111111;
+  --text-mid: #555555;
+  --text-light: #999999;
+  --border: #E5E5E5;
+  --hover: #F0EFED;
+  --accent: #9B59B6;   /* podcast purple — only used for structural accents */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
+    --text-mid: #A8A6A0; --text-light: #6B6963;
+    --border: #333230; --hover: #2C2B28;
+  }
+}
+
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* === ROW 1: HEADER — back link + title + date pills === */
+.header {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 32px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.back-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-light);
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: color 0.12s ease;
+}
+.back-link:hover { color: var(--text); }
+.header h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  flex-shrink: 0;
+}
+.header h1 span {
+  font-weight: 300;
+  color: var(--text-light);
+  margin-left: 4px;
+}
+.date-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.date-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.date-btn:hover { background: var(--hover); border-color: var(--text-light); }
+.date-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+/* === ROW 2: TOOLBAR — category filters + expand all === */
+.toolbar {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 14px 32px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: lowercase;
+}
+.filter-btn:hover { background: var(--hover); border-color: var(--text-light); }
+.filter-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+.expand-all-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.expand-all-btn:hover { background: var(--hover); border-color: var(--text-light); color: var(--text-mid); }
+.expand-all-btn .arrow { display: inline-block; transition: transform 0.2s; font-size: 13px; }
+.expand-all-btn.expanded .arrow { transform: rotate(90deg); }
+
+/* === DIVIDER + COUNT === */
+.divider { max-width: 1000px; margin: 16px auto 0; padding: 0 32px; }
+.divider hr { border: none; height: 1px; background: var(--border); }
+.summary-count {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 12px 32px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* ── Cards — same structure as YouTube viewer ── */
+.cards {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px 48px;
+}
+
+.card {
+  border-bottom: 1px solid var(--border);
+  padding: 28px 0;
+  display: flex;
+  gap: 12px;
+  cursor: pointer;
+}
+.card:last-child { border-bottom: none; }
+
+/* Left accent bar — color per category, same as YouTube viewer */
+.card-accent {
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 60px;
+}
+
+.card-body { flex: 1; min-width: 0; }
+
+/* Show name + artwork row */
+.card-show {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.card-artwork {
+  width: 40px; height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--hover);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  overflow: hidden;
+}
+.card-show-meta {}
+.card-show-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+  line-height: 1.2;
+}
+.card-show-detail {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.card-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--hover);
+  padding: 2px 8px;
+  border-radius: 3px;
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--text-mid);
+}
+.card-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+.card-source {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.card-hook {
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+/* Key findings — identical to YouTube viewer */
+.card-findings { margin-top: 14px; }
+.card-findings-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+}
+.finding {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-mid);
+}
+.finding-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  flex-shrink: 0;
+  min-width: 20px;
+  margin-top: 3px;
+}
+
+/* TTS row — same as YouTube */
+.card-tts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.tts-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text-light);
+  background: transparent;
+  transition: all 0.12s ease;
+}
+.tts-btn:hover { color: var(--text); background: var(--hover); }
+.tts-listen {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: color 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tts-listen:hover { color: var(--text); }
+.tts-spacer { flex: 1; }
+
+/* Collapsed card arrow */
+.card-expand {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.12s;
+}
+.card-expand:hover { color: var(--text); }
+
+@media (max-width: 640px) {
+  .header { padding: 28px 16px 0; flex-direction: column; gap: 4px; }
+  .toolbar { padding: 12px 16px 0; }
+  .divider, .summary-count { padding-left: 16px; padding-right: 16px; }
+  .cards { padding-left: 16px; padding-right: 16px; }
+  .card-title { font-size: 17px; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <a class="back-link" href="v2-header-C.html" title="Back to Morning Brief">←</a>
+  <h1>Morning Brief<span>/ podcasts</span></h1>
+  <div class="date-pills">
+    <button class="date-btn active">Feb 19</button>
+    <button class="date-btn">Feb 18</button>
+    <button class="date-btn">Feb 17</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <button class="filter-btn active">all</button>
+    <button class="filter-btn">tech</button>
+    <button class="filter-btn">health</button>
+    <button class="filter-btn">business</button>
+  </div>
+  <button class="expand-all-btn">
+    <span class="arrow">→</span> <span>expand all</span>
+  </button>
+</div>
+
+<div class="divider"><hr></div>
+<div class="summary-count">3 summaries</div>
+
+<!-- ── Cards ── -->
+<div class="cards">
+
+  <!-- Card 1 — Lex Fridman, expanded -->
+  <div class="card">
+    <div class="card-accent" style="background:#4A90D9"></div>
+    <div class="card-body">
+
+      <div class="card-show">
+        <div class="card-artwork">🎙</div>
+        <div class="card-show-meta">
+          <div class="card-show-name">Lex Fridman Podcast</div>
+          <div class="card-show-detail">Episode #452 · Feb 19, 2026</div>
+        </div>
+      </div>
+
+      <span class="card-tag">Tech</span>
+      <div class="card-title">Sam Altman on the Future of AGI, OpenAI's Roadmap &amp; What Scares Him</div>
+      <div class="card-source">2h 14m · spotify</div>
+      <div class="card-hook">A rare long-form conversation where Altman is unusually candid — on timelines, on what keeps him up at night, and on why he thinks the transition to AGI matters more than any product OpenAI will ship.</div>
+
+      <div class="card-findings">
+        <div class="card-findings-label">Key Findings</div>
+        <div class="finding">
+          <span class="finding-num">01</span>
+          <span>Altman believes AGI is achievable within this decade and that OpenAI is "closer than most people think" — but refuses to give a year.</span>
+        </div>
+        <div class="finding">
+          <span class="finding-num">02</span>
+          <span>He frames the biggest risk not as misalignment but as concentration of power — including OpenAI itself having too much control.</span>
+        </div>
+        <div class="finding">
+          <span class="finding-num">03</span>
+          <span>On o-series reasoning models: "We didn't fully understand why they worked until after they shipped." Admits the field is moving faster than the theory.</span>
+        </div>
+        <div class="finding">
+          <span class="finding-num">04</span>
+          <span>Discussed the departure of key safety researchers — says OpenAI's safety culture is "strong" but acknowledges "reasonable people disagree."</span>
+        </div>
+      </div>
+
+      <div class="card-tts">
+        <span class="tts-listen">▶ Listen</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-btn">1.0×</span>
+        <span class="tts-btn">1.2×</span>
+        <span class="tts-btn">1.5×</span>
+        <span class="tts-btn">2.0×</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2 — Huberman Lab -->
+  <div class="card">
+    <div class="card-accent" style="background:#27AE60"></div>
+    <div class="card-body">
+
+      <div class="card-show">
+        <div class="card-artwork">🧠</div>
+        <div class="card-show-meta">
+          <div class="card-show-name">Huberman Lab</div>
+          <div class="card-show-detail">Episode #231 · Feb 19, 2026</div>
+        </div>
+      </div>
+
+      <span class="card-tag">Health</span>
+      <div class="card-title">Why Sleep Is the Best Performance Drug You're Not Taking Seriously</div>
+      <div class="card-source">1h 48m · spotify</div>
+      <div class="card-hook">Huberman and guest Matthew Walker revisit the science of sleep with new research — specifically around REM deprivation and its effects on emotional regulation, memory consolidation, and metabolic health.</div>
+
+      <div class="card-tts" style="border-top:1px solid var(--border); padding-top:12px; margin-top:14px; display:flex; align-items:center; gap:8px;">
+        <span class="card-expand">↓ Expand</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-listen">▶ Listen</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3 — How I Built This -->
+  <div class="card">
+    <div class="card-accent" style="background:#E67E22"></div>
+    <div class="card-body">
+
+      <div class="card-show">
+        <div class="card-artwork">🏗</div>
+        <div class="card-show-meta">
+          <div class="card-show-name">How I Built This</div>
+          <div class="card-show-detail">Feb 19, 2026</div>
+        </div>
+      </div>
+
+      <span class="card-tag">Business</span>
+      <div class="card-title">The Startup That Beat Google at Search — What We Can Learn</div>
+      <div class="card-source">52m · rss</div>
+      <div class="card-hook">Guy Raz interviews the founder of Perplexity AI on how a tiny team built a product that millions use instead of Google — and the counterintuitive product decisions that got them there.</div>
+
+      <div class="card-tts" style="border-top:1px solid var(--border); padding-top:12px; margin-top:14px; display:flex; align-items:center; gap:8px;">
+        <span class="card-expand">↓ Expand</span>
+        <div class="tts-spacer"></div>
+        <span class="tts-listen">▶ Listen</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

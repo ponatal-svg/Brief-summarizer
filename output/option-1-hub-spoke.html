@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Brief — Option 1: Hub & Spoke</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Design system (identical to viewer) ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --text: #111111;
+  --text-mid: #555555;
+  --text-light: #999999;
+  --border: #E5E5E5;
+  --hover: #F0EFED;
+  --accent-ai: #4A90D9;
+  --accent-health: #27AE60;
+  --accent-podcast: #9B59B6;
+  --accent-web: #E67E22;
+  --accent-humanities: #D4A574;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
+    --text-mid: #A8A6A0; --text-light: #6B6963;
+    --border: #333230; --hover: #2C2B28;
+  }
+}
+
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ── Layout ── */
+.container { max-width: 1000px; margin: 0 auto; padding: 0 32px; }
+
+/* ── Header ── */
+.header {
+  padding: 40px 32px 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.header-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+.header-title span { font-weight: 300; color: var(--text-mid); }
+.header-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* ── Nav tabs ── */
+.nav {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 32px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.nav-tab {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  color: var(--text-mid);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  bottom: -1px;
+}
+.nav-tab:hover { color: var(--text); background: var(--hover); }
+.nav-tab.active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+  border-bottom-color: var(--surface);
+}
+.nav-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Source Hub page ── */
+.hub {
+  padding: 32px 0;
+}
+.hub-intro {
+  font-size: 14px;
+  color: var(--text-mid);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+/* ── Source cards (hub) ── */
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.source-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.source-card:hover {
+  border-color: var(--text-light);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+.source-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.source-card-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.source-card-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  background: var(--hover);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.source-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.source-card-desc {
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.5;
+}
+.source-card-latest {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.source-card-latest-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.source-card-latest-title {
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.source-card-arrow {
+  font-size: 13px;
+  color: var(--text-light);
+  align-self: flex-end;
+}
+
+/* ── Recent across all sources ── */
+.section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+.recent-list { display: flex; flex-direction: column; }
+.recent-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.recent-item:last-child { border-bottom: none; }
+.recent-item:hover { padding-left: 4px; }
+.recent-type-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.recent-content { flex: 1; min-width: 0; }
+.recent-title {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  line-height: 1.35;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-meta {
+  font-size: 12px;
+  color: var(--text-light);
+  display: flex;
+  gap: 8px;
+}
+.recent-source-type {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  background: var(--hover);
+  padding: 2px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ── Content detail page (e.g. YouTube tab) ── */
+.content-page { padding: 28px 0; }
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: transparent;
+  color: var(--text-mid);
+}
+.pill:hover { color: var(--text); background: var(--hover); }
+.pill.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.toolbar-spacer { flex: 1; }
+
+.card { border-bottom: 1px solid var(--border); padding: 28px 0; }
+.card:first-child { padding-top: 0; }
+.card-header { display: flex; align-items: flex-start; gap: 12px; }
+.card-accent {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 60px;
+}
+.card-body { flex: 1; min-width: 0; }
+.card-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--hover);
+  padding: 2px 8px;
+  border-radius: 3px;
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--text-mid);
+}
+.card-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+.card-source {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+}
+.card-hook {
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+
+/* ── Annotation bar ── */
+.annotation {
+  background: var(--hover);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  margin: 16px 0;
+}
+.annotation strong { color: var(--text-mid); }
+
+/* ── Page separator ── */
+.page-sep {
+  margin: 48px 0 32px;
+  border: none;
+  border-top: 2px dashed var(--border);
+  position: relative;
+}
+.page-sep::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  padding: 0 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .container, .header, .nav { padding-left: 16px; padding-right: 16px; }
+  .source-grid { grid-template-columns: 1fr; }
+  .card-title { font-size: 17px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     PAGE 1 — LANDING / HUB
+     ════════════════════════════════════════ -->
+
+<div class="header">
+  <div class="header-title">Morning Brief <span>/ sources</span></div>
+  <div class="header-sub">Thu Feb 19 · 4 new items today</div>
+</div>
+
+<!-- Nav tabs -->
+<div class="nav">
+  <div class="nav-tab active">
+    <span class="nav-dot" style="background:#4A90D9"></span> Overview
+  </div>
+  <div class="nav-tab">
+    <span class="nav-dot" style="background:#E63946"></span> YouTube
+  </div>
+  <div class="nav-tab">
+    <span class="nav-dot" style="background:#9B59B6"></span> Podcasts
+  </div>
+  <div class="nav-tab">
+    <span class="nav-dot" style="background:#E67E22"></span> Web &amp; News
+  </div>
+</div>
+
+<div class="container">
+  <div class="hub">
+
+    <!-- Source type cards -->
+    <div class="source-grid">
+
+      <div class="source-card">
+        <div class="source-card-header">
+          <div class="source-card-icon" style="background:#E63946/10; color:#E63946; font-size:18px">▶</div>
+          <span class="source-card-count">3 new</span>
+        </div>
+        <div class="source-card-name">YouTube</div>
+        <div class="source-card-desc">6 channels monitored · AI, Health, Humanities</div>
+        <div class="source-card-latest">
+          <div class="source-card-latest-label">Latest</div>
+          <div class="source-card-latest-title">The Two Best AI Models Just Got Released Simultaneously</div>
+        </div>
+        <div class="source-card-arrow">→</div>
+      </div>
+
+      <div class="source-card" style="opacity:0.55">
+        <div class="source-card-header">
+          <div class="source-card-icon" style="font-size:18px">🎙</div>
+          <span class="source-card-count">Phase 2</span>
+        </div>
+        <div class="source-card-name">Podcasts</div>
+        <div class="source-card-desc">Spotify &amp; RSS feeds · coming soon</div>
+        <div class="source-card-latest">
+          <div class="source-card-latest-label">Status</div>
+          <div class="source-card-latest-title">Not yet configured</div>
+        </div>
+        <div class="source-card-arrow">→</div>
+      </div>
+
+      <div class="source-card" style="opacity:0.55">
+        <div class="source-card-header">
+          <div class="source-card-icon" style="font-size:18px">🌐</div>
+          <span class="source-card-count">Phase 3</span>
+        </div>
+        <div class="source-card-name">Web &amp; News</div>
+        <div class="source-card-desc">Tracked sites &amp; articles · coming soon</div>
+        <div class="source-card-latest">
+          <div class="source-card-latest-label">Status</div>
+          <div class="source-card-latest-title">Not yet configured</div>
+        </div>
+        <div class="source-card-arrow">→</div>
+      </div>
+
+    </div>
+
+    <!-- Recent across all sources -->
+    <div class="section-label">Recent · all sources</div>
+    <div class="recent-list">
+
+      <div class="recent-item">
+        <div class="recent-type-dot" style="background:#E63946"></div>
+        <div class="recent-content">
+          <div class="recent-title">The Two Best AI Models Just Got Released Simultaneously</div>
+          <div class="recent-meta">
+            <span>AI Explained</span>
+            <span>·</span>
+            <span>Feb 18</span>
+            <span>·</span>
+            <span>14m</span>
+          </div>
+        </div>
+        <div class="recent-source-type">youtube</div>
+      </div>
+
+      <div class="recent-item">
+        <div class="recent-type-dot" style="background:#E63946"></div>
+        <div class="recent-content">
+          <div class="recent-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
+          <div class="recent-meta">
+            <span>Nate B Jones</span>
+            <span>·</span>
+            <span>Feb 18</span>
+            <span>·</span>
+            <span>22m</span>
+          </div>
+        </div>
+        <div class="recent-source-type">youtube</div>
+      </div>
+
+      <div class="recent-item">
+        <div class="recent-type-dot" style="background:#27AE60"></div>
+        <div class="recent-content">
+          <div class="recent-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
+          <div class="recent-meta">
+            <span>Dr. Stacy Sims</span>
+            <span>·</span>
+            <span>Feb 18</span>
+            <span>·</span>
+            <span>18m</span>
+          </div>
+        </div>
+        <div class="recent-source-type">youtube</div>
+      </div>
+
+      <div class="recent-item">
+        <div class="recent-type-dot" style="background:#D4A574"></div>
+        <div class="recent-content">
+          <div class="recent-title">The BIGGEST SCAM in MODERN ART</div>
+          <div class="recent-meta">
+            <span>CangrejoPistolero</span>
+            <span>·</span>
+            <span>Feb 18</span>
+            <span>·</span>
+            <span>31m</span>
+          </div>
+        </div>
+        <div class="recent-source-type">youtube</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<hr class="page-sep" data-label="↓ scroll to see YouTube detail page">
+
+<!-- ════════════════════════════════════════
+     PAGE 2 — YOUTUBE DETAIL (same design as today)
+     ════════════════════════════════════════ -->
+
+<div class="header" style="padding-top:32px">
+  <div class="header-title">Morning Brief <span>/ youtube</span></div>
+  <div class="header-sub">Thu Feb 19 · 3 videos</div>
+</div>
+
+<div class="nav">
+  <div class="nav-tab">
+    <span class="nav-dot" style="background:#4A90D9"></span> Overview
+  </div>
+  <div class="nav-tab active">
+    <span class="nav-dot" style="background:#E63946"></span> YouTube
+  </div>
+  <div class="nav-tab">
+    <span class="nav-dot" style="background:#9B59B6"></span> Podcasts
+  </div>
+  <div class="nav-tab">
+    <span class="nav-dot" style="background:#E67E22"></span> Web &amp; News
+  </div>
+</div>
+
+<div class="container">
+  <div class="content-page">
+
+    <!-- Toolbar: date pills + category filters -->
+    <div class="toolbar">
+      <span class="pill active">Feb 19</span>
+      <span class="pill">Feb 18</span>
+      <span class="pill">Feb 17</span>
+      <div class="toolbar-spacer"></div>
+      <span class="pill" style="background:var(--text);color:var(--bg);border-color:var(--text)">All</span>
+      <span class="pill">AI</span>
+      <span class="pill">Health</span>
+      <span class="pill">Humanities</span>
+    </div>
+
+    <!-- Cards -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-accent" style="background:#4A90D9"></div>
+        <div class="card-body">
+          <span class="card-tag">AI</span>
+          <div class="card-title">The Two Best AI Models Just Got Released Simultaneously</div>
+          <div class="card-source">AI Explained · 14m · Feb 18, 2026</div>
+          <div class="card-hook">Two frontier labs dropped major model updates on the same day — this breakdown compares their capabilities head-to-head and explains what it means for the state of the field.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-accent" style="background:#4A90D9"></div>
+        <div class="card-body">
+          <span class="card-tag">AI</span>
+          <div class="card-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
+          <div class="card-source">Nate B Jones · 22m · Feb 18, 2026</div>
+          <div class="card-hook">A practical framework for understanding where developers actually are with AI-assisted coding — and why the jump from level 2 to 3 is where most people stall out.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-accent" style="background:#27AE60"></div>
+        <div class="card-body">
+          <span class="card-tag">Health</span>
+          <div class="card-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
+          <div class="card-source">Dr. Stacy Sims · 18m · Feb 18, 2026</div>
+          <div class="card-hook">Yoga has real benefits, but research shows it's insufficient for maintaining muscle mass and bone density — especially post-menopause. Here's what the evidence says to add.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="annotation container">
+  <strong>Option 1 — Hub &amp; Spoke.</strong>
+  Landing page shows all source types as cards + unified recent feed. Tabs at top navigate to per-source detail pages (YouTube detail is identical to today's viewer). Muted cards for Phase 2/3 sources show what's coming without clutter.
+</div>
+
+</body>
+</html>

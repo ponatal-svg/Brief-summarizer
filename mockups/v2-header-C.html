@@ -154,7 +154,6 @@ body {
   cursor: pointer;
   color: var(--text-mid);
   transition: all 0.12s ease;
-  background: transparent;
 }
 .date-chip:hover { color: var(--text); background: var(--hover); }
 .date-chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
@@ -170,7 +169,7 @@ body {
   margin-bottom: 12px;
 }
 
-/* ── Recent feed ── */
+/* ── Recent feed — dots are neutral, tag shows source type ── */
 .recent-item {
   display: flex;
   align-items: baseline;
@@ -182,6 +181,7 @@ body {
 }
 .recent-item:hover { padding-left: 4px; }
 .recent-item:last-child { border-bottom: none; }
+/* Single neutral dot — no color confusion */
 .dot {
   width: 5px; height: 5px;
   border-radius: 50%;
@@ -230,7 +230,7 @@ body {
 
   <div class="source-tiles">
 
-    <div class="stile yt" onclick="window.location.href='youtube.html'">
+    <div class="stile yt" onclick="window.location.href='index.html'">
       <div class="stile-row1">
         <span class="stile-icon">▶</span>
         <span class="stile-status live">4 new</span>
@@ -273,7 +273,7 @@ body {
 
   <div class="section-label">All sources · today</div>
 
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
+  <div class="recent-item" onclick="window.location.href='index.html'">
     <div class="dot"></div>
     <div class="recent-body">
       <div class="recent-title">The Two Best AI Models Just Got Released Simultaneously</div>
@@ -289,7 +289,7 @@ body {
     </div>
     <div class="recent-tag">podcast</div>
   </div>
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
+  <div class="recent-item" onclick="window.location.href='index.html'">
     <div class="dot"></div>
     <div class="recent-body">
       <div class="recent-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
@@ -305,7 +305,7 @@ body {
     </div>
     <div class="recent-tag">podcast</div>
   </div>
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
+  <div class="recent-item" onclick="window.location.href='index.html'">
     <div class="dot"></div>
     <div class="recent-body">
       <div class="recent-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
@@ -313,7 +313,7 @@ body {
     </div>
     <div class="recent-tag">youtube</div>
   </div>
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
+  <div class="recent-item" onclick="window.location.href='index.html'">
     <div class="dot"></div>
     <div class="recent-body">
       <div class="recent-title">The BIGGEST SCAM in MODERN ART</div>
