@@ -6,9 +6,10 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from src.fetchers.youtube import VideoInfo
+from src.fetchers.podcast import EpisodeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def generate_summary_files(
     output_dir: Path,
     date_str: str,
 ) -> dict:
-    """Write the summary markdown file.
+    """Write the summary markdown file for a YouTube video.
 
     Returns a dict with path to the generated file.
     """
@@ -48,7 +49,41 @@ def generate_summary_files(
 
     summary_path.write_text(content, encoding="utf-8")
 
-    logger.info(f"  Generated summaries for: {video.title}")
+    logger.info(f"  Generated summary for: {video.title}")
+
+    return {
+        "summary_path": summary_path,
+        "slug": slug,
+    }
+
+
+def generate_podcast_summary_files(
+    episode: EpisodeInfo,
+    summary: str,
+    output_dir: Path,
+    date_str: str,
+) -> dict:
+    """Write the summary markdown file for a podcast episode.
+
+    Returns a dict with path to the generated file.
+    """
+    summaries_dir = output_dir / "podcast-summaries" / date_str
+    summaries_dir.mkdir(parents=True, exist_ok=True)
+
+    slug = slugify(f"{episode.show_name}-{episode.title}")
+    summary_path = summaries_dir / f"{slug}.md"
+
+    duration_str = _format_duration(episode.duration_seconds)
+
+    content = _build_podcast_summary_md(
+        episode=episode,
+        summary_text=summary,
+        duration_str=duration_str,
+    )
+
+    summary_path.write_text(content, encoding="utf-8")
+
+    logger.info(f"  Generated podcast summary for: {episode.title}")
 
     return {
         "summary_path": summary_path,
@@ -61,7 +96,7 @@ def _build_summary_md(
     summary_text: str,
     duration_str: str,
 ) -> str:
-    """Build markdown content for a summary file."""
+    """Build markdown content for a YouTube summary file."""
     lines = [
         f"# {video.title}",
         "",
@@ -78,6 +113,201 @@ def _build_summary_md(
         "",
     ]
     return "\n".join(lines)
+
+
+def _build_podcast_summary_md(
+    episode: EpisodeInfo,
+    summary_text: str,
+    duration_str: str,
+) -> str:
+    """Build markdown content for a podcast summary file."""
+    pub_date = episode.published_at.strftime("%Y-%m-%d")
+    lines = [
+        f"# {episode.title}",
+        "",
+        f"**Show:** {episode.show_name} | "
+        f"**Category:** {episode.category} | "
+        f"**Duration:** {duration_str} | "
+        f"**Published:** {pub_date} | "
+        f"**Language:** {episode.language}",
+        "",
+        f"**Source:** [{episode.episode_url}]({episode.episode_url})",
+        "",
+        f"---",
+        "",
+        summary_text,
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def generate_podcast_daily_digest(
+    entries: list,
+    output_dir: Path,
+    date_str: str,
+    categories: list,
+) -> Path:
+    """Generate the daily podcast digest markdown file.
+
+    Args:
+        entries: List of dicts with keys: episode (EpisodeInfo), paths (dict), error (Optional[str]).
+        output_dir: Base output directory.
+        date_str: Date string like "2026-02-16".
+        categories: List of Category objects for ordering.
+
+    Returns:
+        Path to the generated digest file.
+    """
+    daily_dir = output_dir / "podcast-daily"
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    digest_path = daily_dir / f"{date_str}.md"
+
+    # Merge with existing digest for today
+    existing_entries = _parse_existing_podcast_digest(digest_path, output_dir) if digest_path.exists() else []
+    new_episode_ids = {e["episode"].episode_id for e in entries}
+    merged_entries = [e for e in existing_entries if e["episode_id"] not in new_episode_ids]
+    all_entries = entries + [_stub_podcast_entry(e) for e in merged_entries]
+
+    by_category: dict = {}
+    for entry in all_entries:
+        cat = entry["episode"].category
+        by_category.setdefault(cat, []).append(entry)
+
+    lines = [f"# Morning Brief Podcasts - {date_str}", ""]
+
+    if not all_entries:
+        lines.append("No new podcast episodes found today.")
+        lines.append("")
+    else:
+        lines.append(f"**{len(all_entries)} episode(s)**")
+        lines.append("")
+
+        category_names = [c.name for c in categories]
+        for cat_name in category_names:
+            cat_entries = by_category.get(cat_name, [])
+            if not cat_entries:
+                continue
+            cat_entries = sorted(cat_entries, key=lambda e: e.get("_existing", False))
+
+            lines.append(f"## {cat_name}")
+            lines.append("")
+
+            for entry in cat_entries:
+                ep = entry["episode"]
+                paths = entry.get("paths")
+                error = entry.get("error")
+
+                duration = _format_duration(ep.duration_seconds)
+                pub_date = ep.published_at.strftime("%Y-%m-%d")
+                lines.append(f"### {ep.title}")
+                lines.append(
+                    f"**{ep.show_name}** | {duration} | {pub_date} | "
+                    f"[Listen]({ep.episode_url})"
+                )
+                lines.append("")
+
+                if error:
+                    lines.append(f"> Error: {error}")
+                    lines.append("")
+                elif paths:
+                    if entry.get("_existing"):
+                        summary_rel = paths.get("summary_rel", "")
+                    else:
+                        summary_rel = _relative_path(paths["summary_path"], output_dir)
+                    if summary_rel:
+                        lines.append(f"[Summary]({summary_rel})")
+                        lines.append("")
+
+        for cat_name in sorted(by_category.keys()):
+            if cat_name not in category_names:
+                cat_entries = by_category[cat_name]
+                lines.append(f"## {cat_name}")
+                lines.append("")
+                for entry in cat_entries:
+                    ep = entry["episode"]
+                    lines.append(f"### {ep.title}")
+                    lines.append(f"**{ep.show_name}** | [Listen]({ep.episode_url})")
+                    lines.append("")
+
+    digest_path.write_text("\n".join(lines), encoding="utf-8")
+    logger.info(f"Generated podcast daily digest: {digest_path}")
+    return digest_path
+
+
+def _parse_existing_podcast_digest(digest_path: Path, output_dir: Path) -> list:
+    """Parse an existing podcast digest to extract entry stubs for merging."""
+    entries = []
+    try:
+        text = digest_path.read_text(encoding="utf-8")
+    except OSError:
+        return entries
+
+    current_category = None
+    current: dict = {}
+
+    for line in text.splitlines():
+        if line.startswith("## "):
+            current_category = line[3:].strip()
+        elif line.startswith("### "):
+            if current:
+                entries.append(current)
+            current = {
+                "category": current_category,
+                "title": line[4:].strip(),
+                "show_name": "", "duration": "", "listen_url": "",
+                "pub_date": "", "summary_rel": "", "episode_id": "",
+            }
+        elif current and line.startswith("**") and "|" in line:
+            parts = line.replace("**", "").split("|")
+            current["show_name"] = parts[0].strip() if len(parts) > 0 else ""
+            current["pub_date"] = parts[2].strip() if len(parts) > 2 else ""
+            listen_match = re.search(r'\[Listen\]\(([^)]+)\)', line)
+            if listen_match:
+                current["listen_url"] = listen_match.group(1)
+                # Use URL hash as stable ID for existing entries
+                import hashlib
+                current["episode_id"] = hashlib.sha1(
+                    current["listen_url"].encode()
+                ).hexdigest()[:16]
+        elif current and line.startswith("[Summary]"):
+            match = re.search(r'\[Summary\]\(([^)]+)\)', line)
+            if match:
+                current["summary_rel"] = match.group(1)
+
+    if current:
+        entries.append(current)
+
+    return entries
+
+
+def _stub_podcast_entry(existing: dict) -> dict:
+    """Convert a parsed existing podcast digest entry back into a generator entry dict."""
+    from src.fetchers.podcast import EpisodeInfo
+    from datetime import datetime, timezone
+
+    try:
+        pub = datetime.strptime(existing["pub_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except (ValueError, KeyError):
+        pub = datetime.now(timezone.utc)
+
+    ep = EpisodeInfo(
+        episode_id=existing.get("episode_id", ""),
+        title=existing.get("title", ""),
+        show_name=existing.get("show_name", ""),
+        show_url=existing.get("listen_url", ""),
+        episode_url=existing.get("listen_url", ""),
+        audio_url="",
+        category=existing.get("category", ""),
+        published_at=pub,
+        duration_seconds=0,
+        language="en",
+    )
+    paths = {
+        "summary_path": None,
+        "slug": None,
+        "summary_rel": existing.get("summary_rel", ""),
+    }
+    return {"episode": ep, "paths": paths, "error": None, "_existing": True}
 
 
 def generate_daily_digest(

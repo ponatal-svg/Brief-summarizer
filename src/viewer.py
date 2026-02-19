@@ -909,7 +909,7 @@ def generate_viewer(config: Config, output_dir: Path) -> None:
     cat_path = output_dir / "categories.json"
     cat_path.write_text(json.dumps(categories, indent=2), encoding="utf-8")
 
-    # Write/update digest-index.json (list of available dates)
+    # Write/update digest-index.json (list of available YouTube digest dates)
     daily_dir = output_dir / "daily"
     dates = []
     if daily_dir.exists():
@@ -920,5 +920,17 @@ def generate_viewer(config: Config, output_dir: Path) -> None:
 
     index_json_path = output_dir / "digest-index.json"
     index_json_path.write_text(json.dumps(dates, indent=2), encoding="utf-8")
+
+    # Write/update podcast-index.json (list of available podcast digest dates)
+    podcast_daily_dir = output_dir / "podcast-daily"
+    podcast_dates = []
+    if podcast_daily_dir.exists():
+        podcast_dates = sorted([
+            f.stem for f in podcast_daily_dir.glob("*.md")
+            if len(f.stem) == 10  # YYYY-MM-DD
+        ])
+
+    podcast_index_path = output_dir / "podcast-index.json"
+    podcast_index_path.write_text(json.dumps(podcast_dates, indent=2), encoding="utf-8")
 
     logger.info(f"Generated viewer: {index_path}")

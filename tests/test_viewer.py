@@ -42,15 +42,15 @@ def multi_cat_config():
 def generated_html(tmp_path, multi_cat_config):
     """Generate viewer and return HTML content."""
     generate_viewer(multi_cat_config, tmp_path)
-    return (tmp_path / "index.html").read_text()
+    return (tmp_path / "youtube.html").read_text()
 
 
 # ===== FILE GENERATION =====
 
 class TestFileGeneration:
-    def test_creates_index_html(self, tmp_path, single_cat_config):
+    def test_creates_youtube_html(self, tmp_path, single_cat_config):
         generate_viewer(single_cat_config, tmp_path)
-        assert (tmp_path / "index.html").exists()
+        assert (tmp_path / "youtube.html").exists()
 
     def test_creates_categories_json(self, tmp_path, multi_cat_config):
         generate_viewer(multi_cat_config, tmp_path)
@@ -93,13 +93,13 @@ class TestFileGeneration:
         new_dir = tmp_path / "new_output"
         generate_viewer(single_cat_config, new_dir)
         assert new_dir.exists()
-        assert (new_dir / "index.html").exists()
+        assert (new_dir / "youtube.html").exists()
 
     def test_overwrites_existing_files(self, tmp_path, single_cat_config):
         generate_viewer(single_cat_config, tmp_path)
-        first_content = (tmp_path / "index.html").read_text()
+        first_content = (tmp_path / "youtube.html").read_text()
         generate_viewer(single_cat_config, tmp_path)
-        second_content = (tmp_path / "index.html").read_text()
+        second_content = (tmp_path / "youtube.html").read_text()
         assert first_content == second_content
 
 
@@ -111,7 +111,7 @@ class TestHTMLStructure:
 
     def test_has_header_with_title(self, generated_html):
         assert "Morning Brief" in generated_html
-        assert "/ daily" in generated_html
+        assert "/ youtube" in generated_html
 
     def test_has_date_buttons_container(self, generated_html):
         assert 'id="dateButtons"' in generated_html
