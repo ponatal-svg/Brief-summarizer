@@ -128,7 +128,8 @@ class TestYouTubePipeline:
                                                                 state_path=state_path,
                                                             )
 
-    def test_skips_video_without_transcript(self, tmp_path, config, sample_video):
+    def test_summarizes_video_without_transcript_using_title_only(self, tmp_path, config, sample_video):
+        """Videos with no transcript should be summarized via title-only prompt, not skipped."""
         no_transcript_video = VideoInfo(
             video_id="vid1", title="No Transcript",
             url="https://youtube.com/watch?v=vid1",
@@ -136,26 +137,31 @@ class TestYouTubePipeline:
             upload_date=datetime.now(timezone.utc), duration_seconds=600,
             transcript=None,
         )
+        mock_client = MagicMock()
 
         with patch("src.main.load_config", return_value=config):
-            with patch("src.main.create_client", return_value=MagicMock()):
+            with patch("src.main.create_client", return_value=mock_client):
                 with patch("src.main.fetch_new_videos", return_value=[no_transcript_video]):
                     with patch("src.main.fetch_new_episodes", return_value=[]):
-                        with patch("src.main.summarize") as mock_summarize:
-                            with patch("src.main.generate_daily_digest"):
-                                with patch("src.main.generate_podcast_daily_digest"):
-                                    with patch("src.main.generate_error_report"):
-                                        with patch("src.main.generate_viewer"):
-                                            with patch("src.main.save_state"):
-                                                with patch("src.main.cleanup_old_content", return_value=[]):
-                                                    with patch("src.main.cleanup_state"):
-                                                        run(
-                                                            config_path=tmp_path / "config.yaml",
-                                                            output_dir=tmp_path / "output",
-                                                            state_path=tmp_path / "state.json",
-                                                        )
+                        with patch("src.main.summarize", return_value="title-only summary") as mock_summarize:
+                            with patch("src.main.generate_summary_files", return_value={"summary_path": tmp_path / "s.md", "slug": "s"}):
+                                with patch("src.main.generate_daily_digest"):
+                                    with patch("src.main.generate_podcast_daily_digest"):
+                                        with patch("src.main.generate_error_report"):
+                                            with patch("src.main.generate_viewer"):
+                                                with patch("src.main.save_state"):
+                                                    with patch("src.main.cleanup_old_content", return_value=[]):
+                                                        with patch("src.main.cleanup_state"):
+                                                            run(
+                                                                config_path=tmp_path / "config.yaml",
+                                                                output_dir=tmp_path / "output",
+                                                                state_path=tmp_path / "state.json",
+                                                            )
 
-        mock_summarize.assert_not_called()
+        # Should still call summarize — with transcript=None, which uses NO_TRANSCRIPT_PROMPT
+        mock_summarize.assert_called_once()
+        call_kwargs = mock_summarize.call_args[1]
+        assert call_kwargs["transcript"] is None
 
     def test_youtube_fetch_error_logged_and_continues(self, tmp_path, config):
         with patch("src.main.load_config", return_value=config):
@@ -202,7 +208,8 @@ class TestYouTubePipeline:
         mock_save.assert_called_once()
         mock_digest.assert_called_once()
 
-    def test_summarize_error_recorded_in_digest(self, tmp_path, config, sample_video):
+    def test_summarize_error_logged_not_in_digest(self, tmp_path, config, sample_video):
+        """Summarization failures go to error report only — not shown as cards in the digest."""
         with patch("src.main.load_config", return_value=config):
             with patch("src.main.create_client", return_value=MagicMock()):
                 with patch("src.main.fetch_new_videos", return_value=[sample_video]):
@@ -210,7 +217,7 @@ class TestYouTubePipeline:
                         with patch("src.main.summarize", side_effect=RuntimeError("model error")):
                             with patch("src.main.generate_daily_digest") as mock_digest:
                                 with patch("src.main.generate_podcast_daily_digest"):
-                                    with patch("src.main.generate_error_report"):
+                                    with patch("src.main.generate_error_report") as mock_errors:
                                         with patch("src.main.generate_viewer"):
                                             with patch("src.main.save_state"):
                                                 with patch("src.main.cleanup_old_content", return_value=[]):
@@ -221,11 +228,14 @@ class TestYouTubePipeline:
                                                             state_path=tmp_path / "state.json",
                                                         )
 
-        # digest should be called with error entry
+        # Digest should have NO error entries (errors go to log only)
         call_args = mock_digest.call_args[0]
         entries = call_args[0]
-        assert len(entries) == 1
-        assert entries[0]["error"] == "model error"
+        assert len(entries) == 0
+        # Error report should capture it
+        error_call_args = mock_errors.call_args[0]
+        errors = error_call_args[0]
+        assert any("model error" in e["message"] for e in errors)
 
 
 # ---------------------------------------------------------------------------
@@ -294,7 +304,8 @@ class TestPodcastPipeline:
         call_args = mock_pd.call_args[0]
         assert call_args[0] == []
 
-    def test_transcription_error_recorded(self, tmp_path, config, sample_episode):
+    def test_transcription_error_logged_not_in_digest(self, tmp_path, config, sample_episode):
+        """Transcription failures go to error report only — not shown as cards in the podcast digest."""
         with patch("src.main.load_config", return_value=config):
             with patch("src.main.create_client", return_value=MagicMock()):
                 with patch("src.main.fetch_new_videos", return_value=[]):
@@ -303,7 +314,7 @@ class TestPodcastPipeline:
                                    side_effect=TranscriptionError("audio failed")):
                             with patch("src.main.generate_daily_digest"):
                                 with patch("src.main.generate_podcast_daily_digest") as mock_pd:
-                                    with patch("src.main.generate_error_report"):
+                                    with patch("src.main.generate_error_report") as mock_errors:
                                         with patch("src.main.generate_viewer"):
                                             with patch("src.main.save_state"):
                                                 with patch("src.main.cleanup_old_content", return_value=[]):
@@ -314,10 +325,14 @@ class TestPodcastPipeline:
                                                             state_path=tmp_path / "state.json",
                                                         )
 
+        # Podcast digest should have NO error entries
         call_args = mock_pd.call_args[0]
         entries = call_args[0]
-        assert len(entries) == 1
-        assert entries[0]["error"] == "audio failed"
+        assert len(entries) == 0
+        # Error report should capture it
+        error_call_args = mock_errors.call_args[0]
+        errors = error_call_args[0]
+        assert any("audio failed" in e["message"] for e in errors)
 
     def test_podcast_quota_exhausted_saves_progress(self, tmp_path, config, sample_episode):
         with patch("src.main.load_config", return_value=config):

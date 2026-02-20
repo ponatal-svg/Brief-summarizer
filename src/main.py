@@ -98,13 +98,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 continue
 
             if not video.transcript:
-                msg = f"No transcript available for '{video.title}' — skipping"
-                logger.warning(msg)
-                errors.append({
-                    "source": f"Transcript/{video.channel_name}",
-                    "message": msg,
-                })
-                continue
+                logger.warning(f"  No transcript for '{video.title}' — summarising from title only")
 
             try:
                 summary = summarize(
@@ -135,7 +129,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 msg = f"Summarization failed for '{video.title}': {e}"
                 logger.error(msg)
                 errors.append({"source": f"Gemini/{video.channel_name}", "message": msg})
-                digest_entries.append({"video": video, "paths": None, "error": str(e)})
+                # Do not add to digest_entries — errors stay in logs, not on the UI
                 continue
 
             try:
@@ -202,7 +196,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 msg = str(e)
                 logger.error(f"  Transcription failed for '{episode.title}': {msg}")
                 errors.append({"source": f"Podcast/Transcription/{show.name}", "message": msg})
-                podcast_entries.append({"episode": episode, "paths": None, "error": msg})
+                # Do not add to podcast_entries — errors stay in logs, not on the UI
                 continue
             except Exception as e:
                 error_str = str(e).lower()
@@ -214,7 +208,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 msg = f"Processing failed for '{episode.title}': {e}"
                 logger.error(msg)
                 errors.append({"source": f"Podcast/{show.name}", "message": msg})
-                podcast_entries.append({"episode": episode, "paths": None, "error": str(e)})
+                # Do not add to podcast_entries — errors stay in logs, not on the UI
                 continue
 
             try:
