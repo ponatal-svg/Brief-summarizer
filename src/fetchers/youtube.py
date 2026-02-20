@@ -20,9 +20,6 @@ from src.config import YouTubeSource
 
 logger = logging.getLogger(__name__)
 
-# Shared transcript API instance
-_transcript_api = YouTubeTranscriptApi()
-
 
 @dataclass(frozen=True)
 class VideoInfo:
@@ -172,8 +169,8 @@ def _get_transcript(video_id: str, language: str = "en") -> Optional[str]:
 
     # First attempt: try preferred languages
     try:
-        transcript = _transcript_api.fetch(video_id, languages=languages)
-        text = " ".join(snippet.text for snippet in transcript)
+        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+        text = " ".join(snippet["text"] for snippet in transcript)
         if text.strip():
             return text
     except (TranscriptsDisabled, VideoUnavailable):
@@ -186,13 +183,13 @@ def _get_transcript(video_id: str, language: str = "en") -> Optional[str]:
 
     # Second attempt: try ANY available transcript language
     try:
-        transcript_list = _transcript_api.list(video_id)
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
         available = list(transcript_list)
         if available:
             first = available[0]
             logger.info(f"  Falling back to transcript language: {first.language_code} for {video_id}")
             transcript = first.fetch()
-            text = " ".join(snippet.text for snippet in transcript)
+            text = " ".join(snippet["text"] for snippet in transcript)
             if text.strip():
                 return text
     except Exception as e:

@@ -33,7 +33,7 @@ class PodcastShow:
 @dataclass(frozen=True)
 class Settings:
     max_age_days: int = 7
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
     max_videos_per_channel: int = 3
     lookback_hours: int = 26
     max_episodes_per_show: int = 3

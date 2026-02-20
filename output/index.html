@@ -8,328 +8,296 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
-  --bg: #F7F7F5;
-  --surface: #FFFFFF;
-  --text: #111111;
-  --text-mid: #555555;
-  --text-light: #999999;
-  --border: #E5E5E5;
-  --hover: #F0EFED;
+  --bg: #F7F7F5; --surface: #FFFFFF; --text: #111111; --text-mid: #555555;
+  --text-light: #999999; --border: #E5E5E5; --hover: #F0EFED;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
-    --text-mid: #A8A6A0; --text-light: #6B6963;
-    --border: #333230; --hover: #2C2B28;
+    --text-mid: #A8A6A0; --text-light: #6B6963; --border: #333230; --hover: #2C2B28;
   }
 }
-
-body {
-  font-family: 'DM Sans', -apple-system, sans-serif;
-  font-size: 15px;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
+body { font-family: 'DM Sans', -apple-system, sans-serif; font-size: 15px;
+       background: var(--bg); color: var(--text); line-height: 1.6; }
+.header { max-width: 1000px; margin: 0 auto; padding: 40px 32px 28px; }
+.header-date {
+  font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-mid); margin-bottom: 4px;
 }
-
-.header {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 40px 32px 28px;
-}
-.header-date-big {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-mid);
-  margin-bottom: 4px;
-}
-.header-app {
-  font-size: 28px;
-  font-weight: 300;
-  letter-spacing: -0.5px;
-  line-height: 1;
-  color: var(--text);
-}
+.header-app { font-size: 28px; font-weight: 300; letter-spacing: -0.5px; line-height: 1; }
 .header-app strong { font-weight: 600; }
-
-.container { max-width: 1000px; margin: 0 auto; padding: 0 32px; }
-
-/* ── Source tiles ── */
-.source-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 36px;
-}
+.container { max-width: 1000px; margin: 0 auto; padding: 0 32px 48px; }
+.source-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 36px; }
 .stile {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px 18px 14px;
-  cursor: pointer;
-  transition: all 0.12s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  position: relative;
-  overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 18px 14px; cursor: pointer; transition: all 0.12s ease;
+  display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden;
+  text-decoration: none; color: inherit;
 }
 .stile::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: transparent;
-  transition: background 0.12s ease;
-  border-radius: 10px 0 0 10px;
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: transparent; transition: background 0.12s ease; border-radius: 10px 0 0 10px;
 }
 .stile:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-color: var(--text-light); }
 .stile.yt:hover::before  { background: #E63946; }
 .stile.pod:hover::before { background: #9B59B6; }
-.stile.web:hover::before { background: #E67E22; }
-.stile.muted { cursor: default; opacity: 0.5; }
-.stile.muted:hover { box-shadow: none; border-color: var(--border); }
-.stile.muted:hover::before { background: transparent; }
-
-.stile-row1 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
+.stile.muted { cursor: default; opacity: 0.5; pointer-events: none; }
+.stile-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .stile-icon { font-size: 16px; }
 .stile-status {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 2px 7px;
-  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  padding: 2px 7px; border-radius: 3px;
 }
 .stile-status.live { background: var(--text); color: var(--bg); }
+.stile-status.empty { background: var(--hover); color: var(--text-light); }
 .stile-status.soon { background: var(--hover); color: var(--text-light); }
-.stile-name {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.1px;
-  margin-bottom: 1px;
-}
+.stile-name { font-size: 14px; font-weight: 600; letter-spacing: -0.1px; margin-bottom: 1px; }
 .stile-sub { font-size: 12px; color: var(--text-light); margin-bottom: 10px; }
 .stile-preview {
-  font-size: 12px;
-  color: var(--text-mid);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
+  font-size: 12px; color: var(--text-mid); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; border-top: 1px solid var(--border); padding-top: 10px;
 }
-.stile.muted .stile-preview { font-style: italic; color: var(--text-light); }
-.stile-cta {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-light);
-  margin-top: 6px;
-}
-
-/* ── Date strip ── */
-.date-strip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 20px;
-}
-.date-chip {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 4px 11px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  color: var(--text-mid);
-  transition: all 0.12s ease;
-  background: transparent;
-}
-.date-chip:hover { color: var(--text); background: var(--hover); }
-.date-chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
-
-/* ── Section label ── */
+.stile-preview.italic { font-style: italic; color: var(--text-light); }
+.stile-cta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-light); margin-top: 6px; }
 .section-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--text-light);
-  margin-bottom: 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-light); margin-bottom: 12px;
 }
-
-/* ── Recent feed ── */
 .recent-item {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 13px 0;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: padding 0.1s ease;
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: padding 0.1s ease; text-decoration: none; color: inherit;
 }
 .recent-item:hover { padding-left: 4px; }
 .recent-item:last-child { border-bottom: none; }
-.dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--border);
-  flex-shrink: 0;
-  margin-top: 7px;
-}
+.dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border);
+       flex-shrink: 0; margin-top: 7px; }
 .recent-body { flex: 1; min-width: 0; }
 .recent-title {
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.1px;
-  line-height: 1.35;
-  margin-bottom: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 15px; font-weight: 500; letter-spacing: -0.1px; line-height: 1.35;
+  margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .recent-meta { font-size: 12px; color: var(--text-light); }
 .recent-tag {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-light);
-  background: var(--hover);
-  padding: 2px 6px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  align-self: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-light);
+  background: var(--hover); padding: 2px 6px; border-radius: 3px;
+  flex-shrink: 0; align-self: center;
 }
-
+.empty-state { text-align: center; color: var(--text-light); padding: 3rem; font-size: 14px; }
 @media (max-width: 640px) {
-  .container, .header { padding-left: 16px; padding-right: 16px; }
+  .header, .container { padding-left: 16px; padding-right: 16px; }
   .source-tiles { grid-template-columns: 1fr; }
   .header-app { font-size: 22px; }
 }
 </style>
 </head>
 <body>
-
 <div class="header">
-  <div class="header-date-big">Thursday · Feb 19 2026</div>
+  <div class="header-date" id="headerDate"></div>
   <div class="header-app"><strong>Morning</strong> Brief</div>
 </div>
-
 <div class="container">
-
-  <div class="source-tiles">
-
-    <div class="stile yt" onclick="window.location.href='youtube.html'">
-      <div class="stile-row1">
-        <span class="stile-icon">▶</span>
-        <span class="stile-status live">4 new</span>
-      </div>
-      <div class="stile-name">YouTube</div>
-      <div class="stile-sub">6 channels · AI · Health · Humanities</div>
-      <div class="stile-preview">The Two Best AI Models Just Got Released Simultaneously</div>
-      <div class="stile-cta">View all →</div>
-    </div>
-
-    <div class="stile pod" onclick="window.location.href='podcasts.html'">
-      <div class="stile-row1">
-        <span class="stile-icon">🎙</span>
-        <span class="stile-status live">3 new</span>
-      </div>
-      <div class="stile-name">Podcasts</div>
-      <div class="stile-sub">3 shows · Tech · Health · Business</div>
-      <div class="stile-preview">Lex Fridman — Sam Altman on the Future of AGI</div>
-      <div class="stile-cta">View all →</div>
-    </div>
-
-    <div class="stile web muted">
-      <div class="stile-row1">
-        <span class="stile-icon">🌐</span>
-        <span class="stile-status soon">Phase 3</span>
-      </div>
-      <div class="stile-name">Web &amp; News</div>
-      <div class="stile-sub">Tracked pages &amp; articles</div>
-      <div class="stile-preview">Not yet configured</div>
-    </div>
-
-  </div>
-
-  <div class="date-strip">
-    <span class="date-chip active">Feb 19</span>
-    <span class="date-chip">Feb 18</span>
-    <span class="date-chip">Feb 17</span>
-    <span class="date-chip">Feb 16</span>
-  </div>
-
-  <div class="section-label">All sources · today</div>
-
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
-    <div class="dot"></div>
-    <div class="recent-body">
-      <div class="recent-title">The Two Best AI Models Just Got Released Simultaneously</div>
-      <div class="recent-meta">AI Explained · 14m · Feb 18</div>
-    </div>
-    <div class="recent-tag">youtube</div>
-  </div>
-  <div class="recent-item" onclick="window.location.href='podcasts.html'">
-    <div class="dot"></div>
-    <div class="recent-body">
-      <div class="recent-title">Sam Altman on the Future of AGI, OpenAI's Roadmap &amp; What Scares Him</div>
-      <div class="recent-meta">Lex Fridman · 2h 14m · Feb 19</div>
-    </div>
-    <div class="recent-tag">podcast</div>
-  </div>
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
-    <div class="dot"></div>
-    <div class="recent-body">
-      <div class="recent-title">The 5 Levels of AI Coding (Why Most of You Won't Make It Past Level 2)</div>
-      <div class="recent-meta">Nate B Jones · 22m · Feb 18</div>
-    </div>
-    <div class="recent-tag">youtube</div>
-  </div>
-  <div class="recent-item" onclick="window.location.href='podcasts.html'">
-    <div class="dot"></div>
-    <div class="recent-body">
-      <div class="recent-title">Why Sleep Is the Best Performance Drug You're Not Taking Seriously</div>
-      <div class="recent-meta">Huberman Lab · 1h 48m · Feb 19</div>
-    </div>
-    <div class="recent-tag">podcast</div>
-  </div>
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
-    <div class="dot"></div>
-    <div class="recent-body">
-      <div class="recent-title">Is Yoga Enough for Women? What Women Need for Strength &amp; Longevity</div>
-      <div class="recent-meta">Dr. Stacy Sims · 18m · Feb 18</div>
-    </div>
-    <div class="recent-tag">youtube</div>
-  </div>
-  <div class="recent-item" onclick="window.location.href='youtube.html'">
-    <div class="dot"></div>
-    <div class="recent-body">
-      <div class="recent-title">The BIGGEST SCAM in MODERN ART</div>
-      <div class="recent-meta">CangrejoPistolero · 31m · Feb 18</div>
-    </div>
-    <div class="recent-tag">youtube</div>
-  </div>
-  <div class="recent-item" onclick="window.location.href='podcasts.html'">
-    <div class="dot"></div>
-    <div class="recent-body">
-      <div class="recent-title">The Startup That Beat Google at Search — What We Can Learn</div>
-      <div class="recent-meta">How I Built This · 52m · Feb 19</div>
-    </div>
-    <div class="recent-tag">podcast</div>
-  </div>
-
+  <div class="source-tiles" id="tiles"></div>
+  <div class="section-label" id="feedLabel"></div>
+  <div id="feed"></div>
 </div>
+<script>
+var ytIndex = [];
+var podIndex = [];
+var CATEGORIES = {};
+
+async function init() {
+  var today = new Date();
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('headerDate').textContent =
+    days[today.getDay()] + '\u00b7 ' + months[today.getMonth()] + ' ' + today.getDate() + ' ' + today.getFullYear();
+
+  try { var r = await fetch('categories.json'); CATEGORIES = r.ok ? await r.json() : {}; } catch(e) {}
+  try { var r = await fetch('digest-index.json'); ytIndex = r.ok ? await r.json() : []; } catch(e) {}
+  try { var r = await fetch('podcast-index.json'); podIndex = r.ok ? await r.json() : []; } catch(e) {}
+
+  ytIndex = ytIndex.slice().sort().reverse();
+  podIndex = podIndex.slice().sort().reverse();
+
+  renderTiles();
+  await renderFeed();
+}
+
+function renderTiles() {
+  var latestYt = ytIndex[0] || null;
+  var latestPod = podIndex[0] || null;
+
+  var catNames = Object.keys(CATEGORIES).join(' \u00b7 ');
+
+  var ytStatus = latestYt
+    ? '<span class="stile-status live" id="ytCount">...</span>'
+    : '<span class="stile-status empty">no data</span>';
+  var podStatus = latestPod
+    ? '<span class="stile-status live" id="podCount">...</span>'
+    : '<span class="stile-status empty">no data</span>';
+
+  var ytPreview = latestYt ? '<div class="stile-preview" id="ytPreview">loading...</div>' : '<div class="stile-preview italic">No YouTube digests yet</div>';
+  var podPreview = latestPod ? '<div class="stile-preview" id="podPreview">loading...</div>' : '<div class="stile-preview italic">No podcast digests yet</div>';
+
+  var ytCta = latestYt ? '<div class="stile-cta">View all &rarr;</div>' : '';
+  var podCta = latestPod ? '<div class="stile-cta">View all &rarr;</div>' : '';
+
+  var ytClass = latestYt ? 'stile yt' : 'stile yt muted';
+  var podClass = latestPod ? 'stile pod' : 'stile pod muted';
+
+  document.getElementById('tiles').innerHTML =
+    '<a class="' + ytClass + '" href="youtube.html">' +
+      '<div class="stile-row1"><span class="stile-icon">&#9654;</span>' + ytStatus + '</div>' +
+      '<div class="stile-name">YouTube</div>' +
+      '<div class="stile-sub">' + (catNames || 'No categories') + '</div>' +
+      ytPreview + ytCta +
+    '</a>' +
+    '<a class="' + podClass + '" href="podcasts.html">' +
+      '<div class="stile-row1"><span class="stile-icon">&#127897;</span>' + podStatus + '</div>' +
+      '<div class="stile-name">Podcasts</div>' +
+      '<div class="stile-sub">' + (catNames || 'No categories') + '</div>' +
+      podPreview + podCta +
+    '</a>' +
+    '<div class="stile muted">' +
+      '<div class="stile-row1"><span class="stile-icon">&#127758;</span><span class="stile-status soon">Phase 3</span></div>' +
+      '<div class="stile-name">Web &amp; News</div>' +
+      '<div class="stile-sub">Tracked pages &amp; articles</div>' +
+      '<div class="stile-preview italic">Not yet configured</div>' +
+    '</div>';
+}
+
+async function renderFeed() {
+  var latestYt = ytIndex[0] || null;
+  var latestPod = podIndex[0] || null;
+
+  if (!latestYt && !latestPod) {
+    document.getElementById('feedLabel').textContent = '';
+    document.getElementById('feed').innerHTML = '<div class="empty-state">No content yet. Run the pipeline first.</div>';
+    return;
+  }
+
+  var items = [];
+
+  if (latestYt) {
+    try {
+      var resp = await fetch('daily/' + latestYt + '.md');
+      if (resp.ok) {
+        var md = await resp.text();
+        var parsed = parseDigest(md, 'youtube', latestYt);
+        items = items.concat(parsed);
+        var el = document.getElementById('ytCount');
+        if (el) el.textContent = parsed.length + ' new';
+        var el2 = document.getElementById('ytPreview');
+        if (parsed.length > 0) {
+          if (el2) el2.textContent = parsed[0].title;
+        } else {
+          // Latest date has no content — look back one date for preview
+          if (el2) el2.textContent = 'Nothing new today';
+          var prevYt = ytIndex[1] || null;
+          if (prevYt) {
+            try {
+              var r2 = await fetch('daily/' + prevYt + '.md');
+              if (r2.ok) {
+                var parsed2 = parseDigest(await r2.text(), 'youtube', prevYt);
+                items = items.concat(parsed2);
+              }
+            } catch(e2) {}
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (latestPod) {
+    try {
+      var resp = await fetch('podcast-daily/' + latestPod + '.md');
+      if (resp.ok) {
+        var md = await resp.text();
+        var parsed = parseDigest(md, 'podcast', latestPod);
+        items = items.concat(parsed);
+        var el = document.getElementById('podCount');
+        if (el) el.textContent = parsed.length + ' new';
+        var el2 = document.getElementById('podPreview');
+        if (parsed.length > 0) {
+          if (el2) el2.textContent = parsed[0].title;
+        } else {
+          if (el2) el2.textContent = 'Nothing new today';
+          var prevPod = podIndex[1] || null;
+          if (prevPod) {
+            try {
+              var r2 = await fetch('podcast-daily/' + prevPod + '.md');
+              if (r2.ok) {
+                var parsed2 = parseDigest(await r2.text(), 'podcast', prevPod);
+                items = items.concat(parsed2);
+              }
+            } catch(e2) {}
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (items.length === 0) {
+    document.getElementById('feedLabel').textContent = '';
+    document.getElementById('feed').innerHTML = '<div class="empty-state">No content found for today.</div>';
+    return;
+  }
+
+  var dateStr = latestYt || latestPod;
+  var d = new Date(dateStr + 'T00:00:00');
+  var months2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('feedLabel').textContent =
+    'All sources \u00b7 ' + months2[d.getMonth()] + ' ' + d.getDate();
+
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var href = item.type === 'youtube' ? 'youtube.html' : 'podcasts.html';
+    html += '<a class="recent-item" href="' + href + '">' +
+      '<div class="dot"></div>' +
+      '<div class="recent-body">' +
+        '<div class="recent-title">' + escHtml(item.title) + '</div>' +
+        '<div class="recent-meta">' + escHtml(item.meta) + '</div>' +
+      '</div>' +
+      '<div class="recent-tag">' + item.type + '</div>' +
+      '</a>';
+  }
+  document.getElementById('feed').innerHTML = html;
+}
+
+function parseDigest(md, type, dateStr) {
+  var items = [];
+  var lines = md.split('\n');
+  var currentCat = '';
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (line.startsWith('## ')) { currentCat = line.substring(3).trim(); continue; }
+    if (!line.startsWith('### ')) continue;
+    var title = line.substring(4).trim();
+    // Next non-empty line has: **Source** | duration | date | [Watch/Listen](url)
+    var meta = '';
+    for (var j = i + 1; j < lines.length && j < i + 5; j++) {
+      if (lines[j].trim()) {
+        meta = lines[j].replace(/\*\*/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/\|/g, '·').trim();
+        meta = meta.replace(/\s{2,}/g, ' ').replace(/^·\s*|\s*·$/g, '').trim();
+        break;
+      }
+    }
+    if (title && title !== 'No new content found today.' && !title.startsWith('No new')) {
+      items.push({ title: title, meta: meta, type: type, category: currentCat });
+    }
+  }
+  return items;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
 </body>
 </html>

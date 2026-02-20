@@ -197,7 +197,7 @@ class TestTranscriptionLive:
         summary = download_and_transcribe(
             episode=episodes[0],
             gemini_client=client,
-            gemini_model="gemini-2.0-flash",
+            gemini_model="gemini-2.5-flash",
             max_audio_minutes=10,  # short for test cost
         )
 

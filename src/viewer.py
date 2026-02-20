@@ -59,13 +59,13 @@ body {
   flex-wrap: wrap;
 }
 .back-link {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 400;
-  color: var(--text-light);
+  color: var(--text-mid);
   text-decoration: none;
   flex-shrink: 0;
   transition: color 0.12s ease;
+  line-height: 1;
 }
 .back-link:hover { color: var(--text); }
 .header h1 {
@@ -115,13 +115,14 @@ body {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 500;
-  padding: 5px 12px;
+  padding: 4px 9px;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-mid);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 .date-btn:hover { background: var(--hover); border-color: var(--text-light); }
 .date-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
@@ -530,7 +531,11 @@ async function init() {
   DIGEST_INDEX.forEach(function(d, i) {
     var btn = document.createElement('button');
     btn.className = 'date-btn' + (i === 0 ? ' active' : '');
-    btn.textContent = d;
+    btn.dataset.date = d;
+    // Display MM/DD — compact enough to fit 7 buttons in a row
+    var parts = d.split('-');
+    btn.textContent = parts[1] + '/' + parts[2];
+    btn.title = d;  // full date on hover
     btn.onclick = function() { loadDate(d); };
     nav.appendChild(btn);
   });
@@ -568,7 +573,7 @@ async function loadDate(dateStr) {
   stopTTS();
 
   document.querySelectorAll('.date-btn').forEach(function(b) {
-    b.classList.toggle('active', b.textContent === dateStr);
+    b.classList.toggle('active', b.dataset.date === dateStr);
   });
 
   var content = document.getElementById('content');
@@ -605,7 +610,7 @@ function renderDigest(md, dateStr) {
       cardCount++;
       var title = line.substring(4).trim();
       var color = currentCategory ? (CATEGORIES[currentCategory] || '#888') : '#888';
-      currentCard = { title: title, id: cardCount, category: currentCategory, color: color, channel: '', duration: '', language: 'en' };
+      currentCard = { title: title, id: cardCount, category: currentCategory, color: color, channel: '', duration: '', language: 'en', summaryPath: '' };
       html += '<div class="card" id="card-' + cardCount + '" data-cat="' + (currentCategory || '') + '">';
       html += '<div class="card-accent" style="background:' + color + '"></div>';
       html += '<div class="card-content">';
@@ -632,6 +637,9 @@ function renderDigest(md, dateStr) {
       html += '<h3 class="card-title">' + currentCard.title + '</h3>';
 
     } else if (currentCard && line.includes('[Summary]')) {
+      // Extract the path from [Summary](path) and store on the card
+      var summaryMatch = line.match(/\\[Summary\\]\\(([^)]+)\\)/);
+      if (summaryMatch) currentCard.summaryPath = summaryMatch[1];
       html += '<button class="card-expand" onclick="toggleSummary(' + cardCount + ')">';
       html += '<span class="arrow">\\u2192</span> <span class="label-text">read summary</span></button>';
 
@@ -641,8 +649,12 @@ function renderDigest(md, dateStr) {
   }
   if (currentCard) html += closeCard(currentCard, cardCount);
 
-  content.innerHTML = html;
-  applyFilter(currentFilter);
+  if (cardCount === 0) {
+    content.innerHTML = '<div class="empty">No new content for ' + dateStr + '.</div>';
+  } else {
+    content.innerHTML = html;
+    applyFilter(currentFilter);
+  }
 }
 
 function closeCard(card, id) {
@@ -652,6 +664,7 @@ function closeCard(card, id) {
   h += ' data-channel="' + card.channel.replace(/"/g, '&quot;') + '"';
   h += ' data-duration="' + card.duration.replace(/"/g, '&quot;') + '"';
   h += ' data-language="' + (card.language || 'en') + '"';
+  if (card.summaryPath) h += ' data-summary-path="' + card.summaryPath + '"';
   h += '></div>';
   h += '</div>';
   h += '</div>';
@@ -672,8 +685,9 @@ async function toggleSummary(id) {
   }
 
   if (!body.dataset.loaded) {
-    var slug = findSlugForCard(id);
-    var summaryPath = 'summaries/' + currentDate + '/' + slug + '.md';
+    // Prefer the path embedded in the digest markdown; fall back to slug reconstruction
+    var summaryPath = body.dataset.summaryPath ||
+      ('summaries/' + currentDate + '/' + findSlugForCard(id) + '.md');
     try {
       var resp = await fetch(summaryPath);
       if (!resp.ok) throw new Error('Not found');
@@ -896,6 +910,320 @@ document.addEventListener('DOMContentLoaded', function() { setSpeed(1.0, null); 
 </html>"""
 
 
+PODCASTS_HTML = VIEWER_HTML \
+    .replace("Morning Brief<span>/ youtube</span>", "Morning Brief<span>/ podcasts</span>") \
+    .replace("fetch('daily/'", "fetch('podcast-daily/'") \
+    .replace("fetch('digest-index.json'", "fetch('podcast-index.json'") \
+    .replace("('summaries/' + currentDate", "('podcast-summaries/' + currentDate") \
+    .replace("No digests available yet. Run the pipeline first.", "No podcast episodes available yet. Run the pipeline first.")
+
+
+HUB_HTML = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F7F7F5; --surface: #FFFFFF; --text: #111111; --text-mid: #555555;
+  --text-light: #999999; --border: #E5E5E5; --hover: #F0EFED;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
+    --text-mid: #A8A6A0; --text-light: #6B6963; --border: #333230; --hover: #2C2B28;
+  }
+}
+body { font-family: 'DM Sans', -apple-system, sans-serif; font-size: 15px;
+       background: var(--bg); color: var(--text); line-height: 1.6; }
+.header { max-width: 1000px; margin: 0 auto; padding: 40px 32px 28px; }
+.header-date {
+  font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-mid); margin-bottom: 4px;
+}
+.header-app { font-size: 28px; font-weight: 300; letter-spacing: -0.5px; line-height: 1; }
+.header-app strong { font-weight: 600; }
+.container { max-width: 1000px; margin: 0 auto; padding: 0 32px 48px; }
+.source-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 36px; }
+.stile {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 18px 14px; cursor: pointer; transition: all 0.12s ease;
+  display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden;
+  text-decoration: none; color: inherit;
+}
+.stile::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: transparent; transition: background 0.12s ease; border-radius: 10px 0 0 10px;
+}
+.stile:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-color: var(--text-light); }
+.stile.yt:hover::before  { background: #E63946; }
+.stile.pod:hover::before { background: #9B59B6; }
+.stile.muted { cursor: default; opacity: 0.5; pointer-events: none; }
+.stile-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.stile-icon { font-size: 16px; }
+.stile-status {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  padding: 2px 7px; border-radius: 3px;
+}
+.stile-status.live { background: var(--text); color: var(--bg); }
+.stile-status.empty { background: var(--hover); color: var(--text-light); }
+.stile-status.soon { background: var(--hover); color: var(--text-light); }
+.stile-name { font-size: 14px; font-weight: 600; letter-spacing: -0.1px; margin-bottom: 1px; }
+.stile-sub { font-size: 12px; color: var(--text-light); margin-bottom: 10px; }
+.stile-preview {
+  font-size: 12px; color: var(--text-mid); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; border-top: 1px solid var(--border); padding-top: 10px;
+}
+.stile-preview.italic { font-style: italic; color: var(--text-light); }
+.stile-cta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-light); margin-top: 6px; }
+.section-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-light); margin-bottom: 12px;
+}
+.recent-item {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: padding 0.1s ease; text-decoration: none; color: inherit;
+}
+.recent-item:hover { padding-left: 4px; }
+.recent-item:last-child { border-bottom: none; }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border);
+       flex-shrink: 0; margin-top: 7px; }
+.recent-body { flex: 1; min-width: 0; }
+.recent-title {
+  font-size: 15px; font-weight: 500; letter-spacing: -0.1px; line-height: 1.35;
+  margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.recent-meta { font-size: 12px; color: var(--text-light); }
+.recent-tag {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-light);
+  background: var(--hover); padding: 2px 6px; border-radius: 3px;
+  flex-shrink: 0; align-self: center;
+}
+.empty-state { text-align: center; color: var(--text-light); padding: 3rem; font-size: 14px; }
+@media (max-width: 640px) {
+  .header, .container { padding-left: 16px; padding-right: 16px; }
+  .source-tiles { grid-template-columns: 1fr; }
+  .header-app { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-date" id="headerDate"></div>
+  <div class="header-app"><strong>Morning</strong> Brief</div>
+</div>
+<div class="container">
+  <div class="source-tiles" id="tiles"></div>
+  <div class="section-label" id="feedLabel"></div>
+  <div id="feed"></div>
+</div>
+<script>
+var ytIndex = [];
+var podIndex = [];
+var CATEGORIES = {};
+
+async function init() {
+  var today = new Date();
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('headerDate').textContent =
+    days[today.getDay()] + '\\u00b7 ' + months[today.getMonth()] + ' ' + today.getDate() + ' ' + today.getFullYear();
+
+  try { var r = await fetch('categories.json'); CATEGORIES = r.ok ? await r.json() : {}; } catch(e) {}
+  try { var r = await fetch('digest-index.json'); ytIndex = r.ok ? await r.json() : []; } catch(e) {}
+  try { var r = await fetch('podcast-index.json'); podIndex = r.ok ? await r.json() : []; } catch(e) {}
+
+  ytIndex = ytIndex.slice().sort().reverse();
+  podIndex = podIndex.slice().sort().reverse();
+
+  renderTiles();
+  await renderFeed();
+}
+
+function renderTiles() {
+  var latestYt = ytIndex[0] || null;
+  var latestPod = podIndex[0] || null;
+
+  var catNames = Object.keys(CATEGORIES).join(' \\u00b7 ');
+
+  var ytStatus = latestYt
+    ? '<span class="stile-status live" id="ytCount">...</span>'
+    : '<span class="stile-status empty">no data</span>';
+  var podStatus = latestPod
+    ? '<span class="stile-status live" id="podCount">...</span>'
+    : '<span class="stile-status empty">no data</span>';
+
+  var ytPreview = latestYt ? '<div class="stile-preview" id="ytPreview">loading...</div>' : '<div class="stile-preview italic">No YouTube digests yet</div>';
+  var podPreview = latestPod ? '<div class="stile-preview" id="podPreview">loading...</div>' : '<div class="stile-preview italic">No podcast digests yet</div>';
+
+  var ytCta = latestYt ? '<div class="stile-cta">View all &rarr;</div>' : '';
+  var podCta = latestPod ? '<div class="stile-cta">View all &rarr;</div>' : '';
+
+  var ytClass = latestYt ? 'stile yt' : 'stile yt muted';
+  var podClass = latestPod ? 'stile pod' : 'stile pod muted';
+
+  document.getElementById('tiles').innerHTML =
+    '<a class="' + ytClass + '" href="youtube.html">' +
+      '<div class="stile-row1"><span class="stile-icon">&#9654;</span>' + ytStatus + '</div>' +
+      '<div class="stile-name">YouTube</div>' +
+      '<div class="stile-sub">' + (catNames || 'No categories') + '</div>' +
+      ytPreview + ytCta +
+    '</a>' +
+    '<a class="' + podClass + '" href="podcasts.html">' +
+      '<div class="stile-row1"><span class="stile-icon">&#127897;</span>' + podStatus + '</div>' +
+      '<div class="stile-name">Podcasts</div>' +
+      '<div class="stile-sub">' + (catNames || 'No categories') + '</div>' +
+      podPreview + podCta +
+    '</a>' +
+    '<div class="stile muted">' +
+      '<div class="stile-row1"><span class="stile-icon">&#127758;</span><span class="stile-status soon">Phase 3</span></div>' +
+      '<div class="stile-name">Web &amp; News</div>' +
+      '<div class="stile-sub">Tracked pages &amp; articles</div>' +
+      '<div class="stile-preview italic">Not yet configured</div>' +
+    '</div>';
+}
+
+async function renderFeed() {
+  var latestYt = ytIndex[0] || null;
+  var latestPod = podIndex[0] || null;
+
+  if (!latestYt && !latestPod) {
+    document.getElementById('feedLabel').textContent = '';
+    document.getElementById('feed').innerHTML = '<div class="empty-state">No content yet. Run the pipeline first.</div>';
+    return;
+  }
+
+  var items = [];
+
+  if (latestYt) {
+    try {
+      var resp = await fetch('daily/' + latestYt + '.md');
+      if (resp.ok) {
+        var md = await resp.text();
+        var parsed = parseDigest(md, 'youtube', latestYt);
+        items = items.concat(parsed);
+        var el = document.getElementById('ytCount');
+        if (el) el.textContent = parsed.length + ' new';
+        var el2 = document.getElementById('ytPreview');
+        if (parsed.length > 0) {
+          if (el2) el2.textContent = parsed[0].title;
+        } else {
+          // Latest date has no content — look back one date for preview
+          if (el2) el2.textContent = 'Nothing new today';
+          var prevYt = ytIndex[1] || null;
+          if (prevYt) {
+            try {
+              var r2 = await fetch('daily/' + prevYt + '.md');
+              if (r2.ok) {
+                var parsed2 = parseDigest(await r2.text(), 'youtube', prevYt);
+                items = items.concat(parsed2);
+              }
+            } catch(e2) {}
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (latestPod) {
+    try {
+      var resp = await fetch('podcast-daily/' + latestPod + '.md');
+      if (resp.ok) {
+        var md = await resp.text();
+        var parsed = parseDigest(md, 'podcast', latestPod);
+        items = items.concat(parsed);
+        var el = document.getElementById('podCount');
+        if (el) el.textContent = parsed.length + ' new';
+        var el2 = document.getElementById('podPreview');
+        if (parsed.length > 0) {
+          if (el2) el2.textContent = parsed[0].title;
+        } else {
+          if (el2) el2.textContent = 'Nothing new today';
+          var prevPod = podIndex[1] || null;
+          if (prevPod) {
+            try {
+              var r2 = await fetch('podcast-daily/' + prevPod + '.md');
+              if (r2.ok) {
+                var parsed2 = parseDigest(await r2.text(), 'podcast', prevPod);
+                items = items.concat(parsed2);
+              }
+            } catch(e2) {}
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (items.length === 0) {
+    document.getElementById('feedLabel').textContent = '';
+    document.getElementById('feed').innerHTML = '<div class="empty-state">No content found for today.</div>';
+    return;
+  }
+
+  var dateStr = latestYt || latestPod;
+  var d = new Date(dateStr + 'T00:00:00');
+  var months2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('feedLabel').textContent =
+    'All sources \\u00b7 ' + months2[d.getMonth()] + ' ' + d.getDate();
+
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var href = item.type === 'youtube' ? 'youtube.html' : 'podcasts.html';
+    html += '<a class="recent-item" href="' + href + '">' +
+      '<div class="dot"></div>' +
+      '<div class="recent-body">' +
+        '<div class="recent-title">' + escHtml(item.title) + '</div>' +
+        '<div class="recent-meta">' + escHtml(item.meta) + '</div>' +
+      '</div>' +
+      '<div class="recent-tag">' + item.type + '</div>' +
+      '</a>';
+  }
+  document.getElementById('feed').innerHTML = html;
+}
+
+function parseDigest(md, type, dateStr) {
+  var items = [];
+  var lines = md.split('\\n');
+  var currentCat = '';
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (line.startsWith('## ')) { currentCat = line.substring(3).trim(); continue; }
+    if (!line.startsWith('### ')) continue;
+    var title = line.substring(4).trim();
+    // Next non-empty line has: **Source** | duration | date | [Watch/Listen](url)
+    var meta = '';
+    for (var j = i + 1; j < lines.length && j < i + 5; j++) {
+      if (lines[j].trim()) {
+        meta = lines[j].replace(/\\*\\*/g, '').replace(/\\[.*?\\]\\(.*?\\)/g, '').replace(/\\|/g, '·').trim();
+        meta = meta.replace(/\\s{2,}/g, ' ').replace(/^·\\s*|\\s*·$/g, '').trim();
+        break;
+      }
+    }
+    if (title && title !== 'No new content found today.' && !title.startsWith('No new')) {
+      items.push({ title: title, meta: meta, type: type, category: currentCat });
+    }
+  }
+  return items;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>"""
+
+
 def generate_viewer(config: Config, output_dir: Path) -> None:
     """Generate the static viewer HTML and supporting JSON files."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -933,4 +1261,12 @@ def generate_viewer(config: Config, output_dir: Path) -> None:
     podcast_index_path = output_dir / "podcast-index.json"
     podcast_index_path.write_text(json.dumps(podcast_dates, indent=2), encoding="utf-8")
 
-    logger.info(f"Generated viewer: {index_path}")
+    # Write podcasts.html (podcast detail page)
+    podcasts_path = output_dir / "podcasts.html"
+    podcasts_path.write_text(PODCASTS_HTML, encoding="utf-8")
+
+    # Write index.html (hub page)
+    hub_path = output_dir / "index.html"
+    hub_path.write_text(HUB_HTML, encoding="utf-8")
+
+    logger.info(f"Generated viewer: {index_path}, {podcasts_path}, {hub_path}")

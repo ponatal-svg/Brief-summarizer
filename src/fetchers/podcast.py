@@ -690,11 +690,11 @@ def _transcribe_and_summarize(
     )
 
 
-def _wait_for_file_active(client: genai.Client, uploaded_file, max_wait_seconds: int = 120) -> None:
+def _wait_for_file_active(client: genai.Client, uploaded_file, max_wait_seconds: int = 300) -> None:
     """Poll until the uploaded file is ACTIVE (Gemini processes uploads async)."""
     import time as _time
     waited = 0
-    poll_interval = 3
+    poll_interval = 10
 
     while waited < max_wait_seconds:
         file_info = client.files.get(name=uploaded_file.name)

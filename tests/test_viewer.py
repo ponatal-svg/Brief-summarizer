@@ -13,7 +13,7 @@ import re
 import pytest
 
 from src.config import Category
-from src.viewer import generate_viewer, VIEWER_HTML
+from src.viewer import generate_viewer, VIEWER_HTML, PODCASTS_HTML, HUB_HTML
 
 
 class _FakeConfig:
@@ -51,6 +51,14 @@ class TestFileGeneration:
     def test_creates_youtube_html(self, tmp_path, single_cat_config):
         generate_viewer(single_cat_config, tmp_path)
         assert (tmp_path / "youtube.html").exists()
+
+    def test_creates_podcasts_html(self, tmp_path, single_cat_config):
+        generate_viewer(single_cat_config, tmp_path)
+        assert (tmp_path / "podcasts.html").exists()
+
+    def test_creates_index_html(self, tmp_path, single_cat_config):
+        generate_viewer(single_cat_config, tmp_path)
+        assert (tmp_path / "index.html").exists()
 
     def test_creates_categories_json(self, tmp_path, multi_cat_config):
         generate_viewer(multi_cat_config, tmp_path)
@@ -391,6 +399,18 @@ class TestCardStructure:
     def test_card_stores_language(self, generated_html):
         assert "data-language" in generated_html
 
+    def test_card_stores_summary_path_from_digest(self, generated_html):
+        # Summary path is extracted from [Summary](path) in the digest and stored
+        # as data-summary-path, so slug reconstruction is not needed.
+        assert "data-summary-path" in generated_html
+        assert "summaryMatch" in generated_html
+        assert "currentCard.summaryPath" in generated_html
+
+    def test_toggle_summary_prefers_embedded_path(self, generated_html):
+        # toggleSummary uses data-summary-path when present, falls back to slug only
+        # when the path was not embedded (backward compat for old digests).
+        assert "body.dataset.summaryPath" in generated_html
+
 
 # ===== LANGUAGE SUPPORT =====
 
@@ -442,3 +462,110 @@ class TestErrorHandling:
 
     def test_no_digest_message(self, generated_html):
         assert "No digest for" in generated_html
+
+    def test_empty_digest_shows_message_not_blank(self, generated_html):
+        # When renderDigest finds no cards (e.g. "No new content today" digest),
+        # it must render an informative message rather than a blank page.
+        assert "No new content for" in generated_html
+        assert "cardCount === 0" in generated_html
+
+    def test_empty_digest_does_not_call_apply_filter_when_empty(self, generated_html):
+        # applyFilter should only be called when there are actual cards to filter;
+        # calling it on empty HTML would silently hide the empty-state message.
+        assert "cardCount === 0" in generated_html
+
+
+# ===== PODCASTS PAGE =====
+
+class TestPodcastsHTML:
+    def test_podcasts_title_in_header(self):
+        assert "/ podcasts" in PODCASTS_HTML
+
+    def test_fetches_podcast_daily(self):
+        assert "fetch('podcast-daily/'" in PODCASTS_HTML
+
+    def test_fetches_podcast_index(self):
+        assert "fetch('podcast-index.json'" in PODCASTS_HTML
+
+    def test_loads_podcast_summaries(self):
+        # Summary path uses podcast-summaries/ not summaries/
+        assert "'podcast-summaries/' + currentDate" in PODCASTS_HTML
+        assert "'summaries/' + currentDate" not in PODCASTS_HTML
+
+    def test_no_youtube_daily_path(self):
+        # Should not fetch from youtube daily directory
+        assert "fetch('daily/'" not in PODCASTS_HTML
+
+    def test_no_youtube_in_title(self):
+        assert "/ youtube" not in PODCASTS_HTML
+
+    def test_empty_state_message(self):
+        assert "No podcast episodes available yet" in PODCASTS_HTML
+
+    def test_has_tts_support(self):
+        assert "speechSynthesis" in PODCASTS_HTML
+
+    def test_has_category_filters(self):
+        assert "function buildFilters(" in PODCASTS_HTML
+
+    def test_has_dark_mode(self):
+        assert "prefers-color-scheme: dark" in PODCASTS_HTML
+
+
+# ===== HUB PAGE =====
+
+class TestHubHTML:
+    def test_has_morning_brief_title(self):
+        assert "Morning Brief" in HUB_HTML
+
+    def test_links_to_youtube(self):
+        assert "youtube.html" in HUB_HTML
+
+    def test_links_to_podcasts(self):
+        assert "podcasts.html" in HUB_HTML
+
+    def test_fetches_both_indexes(self):
+        assert "digest-index.json" in HUB_HTML
+        assert "podcast-index.json" in HUB_HTML
+
+    def test_fetches_both_digests(self):
+        assert "fetch('daily/'" in HUB_HTML
+        assert "fetch('podcast-daily/'" in HUB_HTML
+
+    def test_has_three_tiles(self):
+        assert "Phase 3" in HUB_HTML  # web/news tile placeholder
+
+    def test_parse_digest_function(self):
+        assert "function parseDigest(" in HUB_HTML
+
+    def test_has_dark_mode(self):
+        assert "prefers-color-scheme: dark" in HUB_HTML
+
+    def test_has_dynamic_date(self):
+        assert "headerDate" in HUB_HTML
+
+    def test_renders_feed_items(self):
+        assert "recent-item" in HUB_HTML
+
+    def test_has_viewport_meta(self):
+        assert 'name="viewport"' in HUB_HTML
+        assert "width=device-width" in HUB_HTML
+
+    def test_hub_shows_nothing_new_today_when_empty(self):
+        # When the latest digest has 0 items, the preview should read
+        # "Nothing new today" rather than staying stuck on "loading..."
+        assert "Nothing new today" in HUB_HTML
+
+    def test_hub_falls_back_to_previous_date_for_feed(self):
+        # When the latest digest is empty, hub fetches the previous date
+        # (ytIndex[1] / podIndex[1]) so the feed is never blank.
+        assert "ytIndex[1]" in HUB_HTML
+        assert "podIndex[1]" in HUB_HTML
+
+    def test_hub_podcasts_fallback_uses_podcast_daily(self):
+        # The podcast fallback must fetch from podcast-daily/, not daily/
+        assert "podcast-daily/' + prevPod" in HUB_HTML
+
+    def test_hub_youtube_fallback_uses_daily(self):
+        # The YouTube fallback must fetch from daily/, not podcast-daily/
+        assert "daily/' + prevYt" in HUB_HTML
