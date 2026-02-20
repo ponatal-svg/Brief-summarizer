@@ -81,58 +81,84 @@ class TestIsWithinLookback:
 
 
 class TestGetTranscript:
-    def test_successful_fetch(self):
-        mock_snippet_1 = MagicMock()
-        mock_snippet_1.text = "Hello"
-        mock_snippet_2 = MagicMock()
-        mock_snippet_2.text = "world"
+    """Tests for _get_transcript().
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.return_value = [mock_snippet_1, mock_snippet_2]
+    Patches YouTubeTranscriptApi class methods (get_transcript / list_transcripts).
+    Snippets are plain dicts: {"text": str, "start": float, "duration": float}.
+    """
+
+    def test_successful_fetch(self):
+        snippets = [{"text": "Hello", "start": 0.0, "duration": 1.0},
+                    {"text": "world", "start": 1.0, "duration": 1.0}]
+
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   return_value=snippets) as mock_get:
             result = _get_transcript("abc123")
 
         assert result == "Hello world"
-        mock_api.fetch.assert_called_once_with(
-            "abc123", languages=["en", "en-US", "en-GB"]
-        )
+        mock_get.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
 
     def test_no_transcript_available(self):
         from youtube_transcript_api._errors import TranscriptsDisabled
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.side_effect = TranscriptsDisabled("abc123")
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   side_effect=TranscriptsDisabled("abc123")):
             result = _get_transcript("abc123")
 
         assert result is None
 
-    def test_no_transcript_found(self):
+    def test_no_transcript_found_falls_back_to_list(self):
         from youtube_transcript_api._errors import NoTranscriptFound
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.side_effect = NoTranscriptFound("abc123", [], [])
-            result = _get_transcript("abc123")
+        snippets = [{"text": "Hola", "start": 0.0, "duration": 1.0}]
+        mock_transcript = MagicMock()
+        mock_transcript.language_code = "es"
+        mock_transcript.fetch.return_value = snippets
 
-        assert result is None
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   side_effect=NoTranscriptFound("abc123", [], [])):
+            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
+                       return_value=[mock_transcript]):
+                result = _get_transcript("abc123")
+
+        assert result == "Hola"
 
     def test_video_unavailable(self):
         from youtube_transcript_api._errors import VideoUnavailable
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.side_effect = VideoUnavailable("abc123")
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   side_effect=VideoUnavailable("abc123")):
             result = _get_transcript("abc123")
 
         assert result is None
 
-    def test_generic_error_returns_none(self):
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.side_effect = RuntimeError("network error")
-            result = _get_transcript("abc123")
+    def test_generic_error_falls_back_to_list(self):
+        """A generic error on get_transcript tries list_transcripts next."""
+        snippets = [{"text": "fallback", "start": 0.0, "duration": 1.0}]
+        mock_transcript = MagicMock()
+        mock_transcript.language_code = "en"
+        mock_transcript.fetch.return_value = snippets
+
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   side_effect=RuntimeError("network error")):
+            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
+                       return_value=[mock_transcript]):
+                result = _get_transcript("abc123")
+
+        assert result == "fallback"
+
+    def test_both_attempts_fail_returns_none(self):
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   side_effect=RuntimeError("fail")):
+            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
+                       side_effect=RuntimeError("also fail")):
+                result = _get_transcript("abc123")
 
         assert result is None
 
     def test_empty_transcript_returns_none(self):
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.return_value = []
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   return_value=[]):
             result = _get_transcript("abc123")
 
         assert result is None
@@ -350,70 +376,61 @@ class TestFetchNewVideos:
 
 class TestGetTranscriptLanguage:
     def test_english_default_languages(self):
-        mock_snippet = MagicMock()
-        mock_snippet.text = "Hello"
+        snippets = [{"text": "Hello", "start": 0.0, "duration": 1.0}]
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.return_value = [mock_snippet]
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   return_value=snippets) as mock_get:
             _get_transcript("abc123", language="en")
 
-        mock_api.fetch.assert_called_once_with(
-            "abc123", languages=["en", "en-US", "en-GB"]
-        )
+        mock_get.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
 
     def test_spanish_language_priority(self):
-        mock_snippet = MagicMock()
-        mock_snippet.text = "Hola"
+        snippets = [{"text": "Hola", "start": 0.0, "duration": 1.0}]
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.return_value = [mock_snippet]
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   return_value=snippets) as mock_get:
             result = _get_transcript("abc123", language="es")
 
-        mock_api.fetch.assert_called_once_with(
-            "abc123", languages=["es", "en", "en-US", "en-GB"]
-        )
+        mock_get.assert_called_once_with("abc123", languages=["es", "en", "en-US", "en-GB"])
         assert result == "Hola"
 
     def test_hebrew_language_priority(self):
-        mock_snippet = MagicMock()
-        mock_snippet.text = "שלום"
+        snippets = [{"text": "שלום", "start": 0.0, "duration": 1.0}]
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.return_value = [mock_snippet]
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   return_value=snippets) as mock_get:
             result = _get_transcript("abc123", language="he")
 
-        mock_api.fetch.assert_called_once_with(
-            "abc123", languages=["he", "en", "en-US", "en-GB"]
-        )
+        mock_get.assert_called_once_with("abc123", languages=["he", "en", "en-US", "en-GB"])
         assert result == "שלום"
 
     def test_falls_back_to_any_available_language(self):
         """When preferred languages fail, should try listing all transcripts."""
         from youtube_transcript_api._errors import NoTranscriptFound
 
-        mock_snippet = MagicMock()
-        mock_snippet.text = "Hola mundo"
-
+        snippets = [{"text": "Hola mundo", "start": 0.0, "duration": 1.0}]
         mock_transcript_obj = MagicMock()
         mock_transcript_obj.language_code = "es"
-        mock_transcript_obj.fetch.return_value = [mock_snippet]
+        mock_transcript_obj.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.side_effect = NoTranscriptFound("abc123", [], [])
-            mock_api.list.return_value = [mock_transcript_obj]
-            result = _get_transcript("abc123", language="es")
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   side_effect=NoTranscriptFound("abc123", [], [])):
+            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
+                       return_value=[mock_transcript_obj]) as mock_list:
+                result = _get_transcript("abc123", language="es")
 
         assert result == "Hola mundo"
-        mock_api.list.assert_called_once_with("abc123")
+        mock_list.assert_called_once_with("abc123")
 
     def test_fallback_returns_none_when_no_transcripts_at_all(self):
         """When no transcripts exist at all, should return None gracefully."""
         from youtube_transcript_api._errors import NoTranscriptFound
 
-        with patch("src.fetchers.youtube._transcript_api") as mock_api:
-            mock_api.fetch.side_effect = NoTranscriptFound("abc123", [], [])
-            mock_api.list.return_value = []
-            result = _get_transcript("abc123", language="es")
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   side_effect=NoTranscriptFound("abc123", [], [])):
+            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
+                       return_value=[]):
+                result = _get_transcript("abc123", language="es")
 
         assert result is None
 

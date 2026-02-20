@@ -11,6 +11,8 @@ categories:
   #   color: "#C0392B"
   - name: Humanities
     color: "#D4A574"
+  - name: News
+    color: "#E67E22"
 
 sources:
   youtube:
@@ -44,6 +46,17 @@ sources:
       name: "Entiende Tu Mente"
       category: "Wellbeing"
       language: "es"
+    # News podcasts
+    - podcast_url: "https://open.spotify.com/show/02HrvZIs1Az8vwVu6VMbXE"
+      name: "The Daily"
+      category: "News"
+    - podcast_url: "https://open.spotify.com/show/0GRPAKeSMASfbQ7VgNwYCR"
+      name: "Global News Podcast"
+      category: "News"
+    # Humanities podcast
+    - podcast_url: "https://open.spotify.com/show/11VjrLJfoiNvgjjqov4RWh"
+      name: "Philosophize This!"
+      category: "Humanities"
 
 settings:
   max_age_days: 7
@@ -51,6 +64,6 @@ settings:
   max_videos_per_channel: 1
   lookback_hours: 168
   # Podcast-specific settings
-  max_episodes_per_show: 3
+  max_episodes_per_show: 1
   min_episodes_per_show: 1
   max_audio_minutes: 60
