@@ -32,6 +32,9 @@ class VideoInfo:
     duration_seconds: int
     transcript: Optional[str]
     language: str = "en"
+    # Sparse timestamp index: list of (start_seconds, text_snippet) sampled ~every 30s.
+    # Used to provide Gemini with time anchors for citation markers [t=NNs].
+    transcript_segments: tuple = ()
 
 
 def fetch_new_videos(
@@ -69,7 +72,7 @@ def fetch_new_videos(
         if upload_date and not _is_within_lookback(upload_date, lookback_hours):
             continue
 
-        transcript = _get_transcript(video_id, language=source.language)
+        transcript, segments = _get_transcript(video_id, language=source.language)
 
         video = VideoInfo(
             video_id=video_id,
@@ -81,6 +84,7 @@ def fetch_new_videos(
             duration_seconds=entry.get("duration") or 0,
             transcript=transcript,
             language=source.language,
+            transcript_segments=segments,
         )
         videos.append(video)
         logger.info(f"  Found: {video.title} (transcript: {'yes' if transcript else 'no'})")
@@ -95,7 +99,7 @@ def fetch_new_videos(
             real_date = _get_video_upload_date(video_id)
             if real_date:
                 upload_date = real_date
-            transcript = _get_transcript(video_id, language=source.language)
+            transcript, segments = _get_transcript(video_id, language=source.language)
             video = VideoInfo(
                 video_id=video_id,
                 title=latest.get("title", "Untitled"),
@@ -106,6 +110,7 @@ def fetch_new_videos(
                 duration_seconds=latest.get("duration") or 0,
                 transcript=transcript,
                 language=source.language,
+                transcript_segments=segments,
             )
             videos.append(video)
             logger.info(f"  Fallback: {video.title} (outside lookback, included as latest)")
@@ -156,10 +161,15 @@ def _get_channel_entries(channel_url: str, max_videos: int) -> list:
     return entries
 
 
-def _get_transcript(video_id: str, language: str = "en") -> Optional[str]:
+def _get_transcript(video_id: str, language: str = "en") -> tuple:
     """Fetch transcript for a video using youtube-transcript-api.
 
     Tries the configured language first, then English, then any available language.
+
+    Returns:
+        (text, segments) where text is the full transcript string and segments is a
+        tuple of (start_seconds: int, snippet: str) pairs sampled ~every 30 seconds.
+        Both are None / () on failure.
     """
     # Build language priority list: configured language variants first, then English fallback
     if language == "en":
@@ -169,13 +179,13 @@ def _get_transcript(video_id: str, language: str = "en") -> Optional[str]:
 
     # First attempt: try preferred languages
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
-        text = " ".join(snippet["text"] for snippet in transcript)
+        raw = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+        text = " ".join(snippet["text"] for snippet in raw)
         if text.strip():
-            return text
+            return text, _sample_segments(raw)
     except (TranscriptsDisabled, VideoUnavailable):
         logger.info(f"  No transcript available for {video_id}")
-        return None
+        return None, ()
     except NoTranscriptFound:
         pass  # Fall through to try any available language
     except Exception as e:
@@ -188,14 +198,37 @@ def _get_transcript(video_id: str, language: str = "en") -> Optional[str]:
         if available:
             first = available[0]
             logger.info(f"  Falling back to transcript language: {first.language_code} for {video_id}")
-            transcript = first.fetch()
-            text = " ".join(snippet["text"] for snippet in transcript)
+            raw = first.fetch()
+            text = " ".join(snippet["text"] for snippet in raw)
             if text.strip():
-                return text
+                return text, _sample_segments(raw)
     except Exception as e:
         logger.warning(f"  Transcript fallback failed for {video_id}: {e}")
 
-    return None
+    return None, ()
+
+
+def _sample_segments(raw: list, interval_seconds: int = 30) -> tuple:
+    """Return a sparse sample of transcript segments for timestamp citation.
+
+    Picks one segment per `interval_seconds` window to give Gemini ~30s-resolution
+    time anchors without bloating the prompt with every line.
+
+    Returns a tuple of (start_seconds: int, text: str) pairs.
+    """
+    if not raw:
+        return ()
+    samples = []
+    next_threshold = 0.0
+    for snippet in raw:
+        start = float(snippet.get("start", 0))
+        if start >= next_threshold:
+            text = snippet.get("text", "").strip()
+            if text:
+                samples.append((int(start), text))
+                next_threshold = start + interval_seconds
+            # If text is empty, don't advance the threshold — keep looking
+    return tuple(samples)
 
 
 def _get_video_upload_date(video_id: str) -> Optional[datetime]:

@@ -17,6 +17,7 @@ from src.fetchers.youtube import (
     _get_video_upload_date,
     _parse_upload_date,
     _is_within_lookback,
+    _sample_segments,
 )
 
 
@@ -80,32 +81,109 @@ class TestIsWithinLookback:
         assert _is_within_lookback(just_outside, 26) is False
 
 
+class TestSampleSegments:
+    """Tests for _sample_segments() — the timestamp index builder."""
+
+    def test_empty_returns_empty_tuple(self):
+        assert _sample_segments([]) == ()
+
+    def test_single_snippet(self):
+        raw = [{"text": "Hello world", "start": 0.0, "duration": 2.0}]
+        result = _sample_segments(raw)
+        assert result == ((0, "Hello world"),)
+
+    def test_samples_every_30s_by_default(self):
+        # 3 snippets: 0s, 15s, 30s — only 0s and 30s should be sampled
+        raw = [
+            {"text": "First", "start": 0.0, "duration": 5.0},
+            {"text": "Middle", "start": 15.0, "duration": 5.0},
+            {"text": "Third", "start": 30.0, "duration": 5.0},
+        ]
+        result = _sample_segments(raw)
+        starts = [s for s, _ in result]
+        assert 0 in starts
+        assert 30 in starts
+        assert 15 not in starts
+
+    def test_custom_interval(self):
+        raw = [
+            {"text": "A", "start": 0.0, "duration": 2.0},
+            {"text": "B", "start": 10.0, "duration": 2.0},
+            {"text": "C", "start": 20.0, "duration": 2.0},
+        ]
+        result = _sample_segments(raw, interval_seconds=10)
+        starts = [s for s, _ in result]
+        assert 0 in starts
+        assert 10 in starts
+        assert 20 in starts
+
+    def test_returns_tuple_of_tuples(self):
+        raw = [{"text": "Hi", "start": 5.0, "duration": 1.0}]
+        result = _sample_segments(raw)
+        assert isinstance(result, tuple)
+        assert isinstance(result[0], tuple)
+        assert result[0] == (5, "Hi")
+
+    def test_skips_empty_text(self):
+        raw = [
+            {"text": "", "start": 0.0, "duration": 1.0},
+            {"text": "   ", "start": 1.0, "duration": 1.0},
+            {"text": "Real text", "start": 2.0, "duration": 1.0},
+        ]
+        result = _sample_segments(raw)
+        # Only "Real text" has non-empty text and falls in the first window
+        assert len(result) == 1
+        assert result[0][1] == "Real text"
+
+    def test_start_seconds_are_integers(self):
+        raw = [{"text": "Test", "start": 12.7, "duration": 1.0}]
+        result = _sample_segments(raw)
+        assert isinstance(result[0][0], int)
+        assert result[0][0] == 12
+
+
 class TestGetTranscript:
     """Tests for _get_transcript().
 
     Patches YouTubeTranscriptApi class methods (get_transcript / list_transcripts).
     Snippets are plain dicts: {"text": str, "start": float, "duration": float}.
+    Now returns (text, segments) tuple.
     """
 
-    def test_successful_fetch(self):
+    def test_successful_fetch_returns_text(self):
         snippets = [{"text": "Hello", "start": 0.0, "duration": 1.0},
                     {"text": "world", "start": 1.0, "duration": 1.0}]
 
         with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
                    return_value=snippets) as mock_get:
-            result = _get_transcript("abc123")
+            text, segments = _get_transcript("abc123")
 
-        assert result == "Hello world"
+        assert text == "Hello world"
         mock_get.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
+
+    def test_successful_fetch_returns_segments(self):
+        snippets = [{"text": "Hello", "start": 0.0, "duration": 1.0},
+                    {"text": "world", "start": 45.0, "duration": 1.0}]
+
+        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
+                   return_value=snippets):
+            text, segments = _get_transcript("abc123")
+
+        assert isinstance(segments, tuple)
+        assert len(segments) >= 1
+        # First segment at t=0 should always be included
+        assert segments[0][0] == 0
+        assert segments[0][1] == "Hello"
 
     def test_no_transcript_available(self):
         from youtube_transcript_api._errors import TranscriptsDisabled
 
         with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
                    side_effect=TranscriptsDisabled("abc123")):
-            result = _get_transcript("abc123")
+            text, segments = _get_transcript("abc123")
 
-        assert result is None
+        assert text is None
+        assert segments == ()
 
     def test_no_transcript_found_falls_back_to_list(self):
         from youtube_transcript_api._errors import NoTranscriptFound
@@ -119,18 +197,20 @@ class TestGetTranscript:
                    side_effect=NoTranscriptFound("abc123", [], [])):
             with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
                        return_value=[mock_transcript]):
-                result = _get_transcript("abc123")
+                text, segments = _get_transcript("abc123")
 
-        assert result == "Hola"
+        assert text == "Hola"
+        assert isinstance(segments, tuple)
 
     def test_video_unavailable(self):
         from youtube_transcript_api._errors import VideoUnavailable
 
         with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
                    side_effect=VideoUnavailable("abc123")):
-            result = _get_transcript("abc123")
+            text, segments = _get_transcript("abc123")
 
-        assert result is None
+        assert text is None
+        assert segments == ()
 
     def test_generic_error_falls_back_to_list(self):
         """A generic error on get_transcript tries list_transcripts next."""
@@ -143,25 +223,26 @@ class TestGetTranscript:
                    side_effect=RuntimeError("network error")):
             with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
                        return_value=[mock_transcript]):
-                result = _get_transcript("abc123")
+                text, segments = _get_transcript("abc123")
 
-        assert result == "fallback"
+        assert text == "fallback"
 
     def test_both_attempts_fail_returns_none(self):
         with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
                    side_effect=RuntimeError("fail")):
             with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
                        side_effect=RuntimeError("also fail")):
-                result = _get_transcript("abc123")
+                text, segments = _get_transcript("abc123")
 
-        assert result is None
+        assert text is None
+        assert segments == ()
 
     def test_empty_transcript_returns_none(self):
         with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
                    return_value=[]):
-            result = _get_transcript("abc123")
+            text, segments = _get_transcript("abc123")
 
-        assert result is None
+        assert text is None
 
 
 class TestGetChannelEntries:
@@ -205,7 +286,7 @@ class TestFetchNewVideos:
 
     def test_skips_processed_ids(self, sample_source, sample_entry):
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+            with patch("src.fetchers.youtube._get_transcript", return_value=("text", ())):
                 result = fetch_new_videos(
                     sample_source,
                     processed_ids={"abc123"},
@@ -216,7 +297,7 @@ class TestFetchNewVideos:
 
     def test_returns_new_videos(self, sample_source, sample_entry):
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value="transcript text"):
+            with patch("src.fetchers.youtube._get_transcript", return_value=("transcript text", ())):
                 result = fetch_new_videos(
                     sample_source,
                     processed_ids=set(),
@@ -231,7 +312,7 @@ class TestFetchNewVideos:
 
     def test_handles_no_transcript(self, sample_source, sample_entry):
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value=None):
+            with patch("src.fetchers.youtube._get_transcript", return_value=(None, ())):
                 result = fetch_new_videos(
                     sample_source,
                     processed_ids=set(),
@@ -250,7 +331,7 @@ class TestFetchNewVideos:
             "duration": 300,
         }
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[old_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value=None):
+            with patch("src.fetchers.youtube._get_transcript", return_value=(None, ())):
                 result = fetch_new_videos(
                     sample_source,
                     processed_ids=set(),
@@ -290,7 +371,7 @@ class TestFetchNewVideos:
         }
         # sample_entry is within lookback, old_entry is not
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry, old_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+            with patch("src.fetchers.youtube._get_transcript", return_value=("text", ())):
                 result = fetch_new_videos(
                     sample_source,
                     processed_ids=set(),
@@ -312,8 +393,9 @@ class TestFetchNewVideos:
             assert len(result) == 0
 
     def test_video_info_fields(self, sample_source, sample_entry):
+        segs = ((0, "Hello"),)
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+            with patch("src.fetchers.youtube._get_transcript", return_value=("text", segs)):
                 with patch("src.fetchers.youtube._get_video_upload_date", return_value=None):
                     result = fetch_new_videos(
                         sample_source,
@@ -326,12 +408,13 @@ class TestFetchNewVideos:
                     assert video.channel_name == "Test Channel"
                     assert video.duration_seconds == 600
                     assert video.language == "en"  # default from source
+                    assert video.transcript_segments == segs
 
     def test_real_upload_date_overrides_flat_playlist(self, sample_source, sample_entry):
         """When yt-dlp per-video fetch returns a date, it should override the flat-playlist date."""
         real_date = datetime(2026, 2, 14, tzinfo=timezone.utc)
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+            with patch("src.fetchers.youtube._get_transcript", return_value=("text", ())):
                 with patch("src.fetchers.youtube._get_video_upload_date", return_value=real_date):
                     result = fetch_new_videos(
                         sample_source,
@@ -344,7 +427,7 @@ class TestFetchNewVideos:
     def test_falls_back_to_flat_playlist_date_when_real_fails(self, sample_source, sample_entry):
         """When per-video date fetch fails, should use the flat-playlist date."""
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+            with patch("src.fetchers.youtube._get_transcript", return_value=("text", ())):
                 with patch("src.fetchers.youtube._get_video_upload_date", return_value=None):
                     result = fetch_new_videos(
                         sample_source,
@@ -352,7 +435,7 @@ class TestFetchNewVideos:
                         lookback_hours=26,
                         max_videos=3,
                     )
-                    # Should use the flat-playlist date (today) from sample_entry
+                    # Should use the flat-playlist date (today) since real fetch returned None
                     assert result[0].upload_date is not None
                     assert result[0].upload_date.date() == datetime.now(timezone.utc).date()
 
@@ -364,7 +447,7 @@ class TestFetchNewVideos:
             language="es",
         )
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
-            with patch("src.fetchers.youtube._get_transcript", return_value="texto"):
+            with patch("src.fetchers.youtube._get_transcript", return_value=("texto", ())):
                 result = fetch_new_videos(
                     source,
                     processed_ids=set(),
@@ -389,20 +472,20 @@ class TestGetTranscriptLanguage:
 
         with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
                    return_value=snippets) as mock_get:
-            result = _get_transcript("abc123", language="es")
+            text, _ = _get_transcript("abc123", language="es")
 
         mock_get.assert_called_once_with("abc123", languages=["es", "en", "en-US", "en-GB"])
-        assert result == "Hola"
+        assert text == "Hola"
 
     def test_hebrew_language_priority(self):
         snippets = [{"text": "שלום", "start": 0.0, "duration": 1.0}]
 
         with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
                    return_value=snippets) as mock_get:
-            result = _get_transcript("abc123", language="he")
+            text, _ = _get_transcript("abc123", language="he")
 
         mock_get.assert_called_once_with("abc123", languages=["he", "en", "en-US", "en-GB"])
-        assert result == "שלום"
+        assert text == "שלום"
 
     def test_falls_back_to_any_available_language(self):
         """When preferred languages fail, should try listing all transcripts."""
@@ -417,9 +500,9 @@ class TestGetTranscriptLanguage:
                    side_effect=NoTranscriptFound("abc123", [], [])):
             with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
                        return_value=[mock_transcript_obj]) as mock_list:
-                result = _get_transcript("abc123", language="es")
+                text, _ = _get_transcript("abc123", language="es")
 
-        assert result == "Hola mundo"
+        assert text == "Hola mundo"
         mock_list.assert_called_once_with("abc123")
 
     def test_fallback_returns_none_when_no_transcripts_at_all(self):
@@ -430,9 +513,10 @@ class TestGetTranscriptLanguage:
                    side_effect=NoTranscriptFound("abc123", [], [])):
             with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
                        return_value=[]):
-                result = _get_transcript("abc123", language="es")
+                text, segments = _get_transcript("abc123", language="es")
 
-        assert result is None
+        assert text is None
+        assert segments == ()
 
 
 class TestGetVideoUploadDate:
@@ -492,7 +576,7 @@ class TestFetchNewVideosDateFallback:
 
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[entry_no_date]):
             with patch("src.fetchers.youtube._get_video_upload_date", return_value=real_date) as mock_date:
-                with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+                with patch("src.fetchers.youtube._get_transcript", return_value=("text", ())):
                     result = fetch_new_videos(
                         sample_source,
                         processed_ids=set(),
@@ -508,7 +592,7 @@ class TestFetchNewVideosDateFallback:
         """When _get_video_upload_date returns None, should use flat-playlist date."""
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):
             with patch("src.fetchers.youtube._get_video_upload_date", return_value=None) as mock_date:
-                with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+                with patch("src.fetchers.youtube._get_transcript", return_value=("text", ())):
                     result = fetch_new_videos(
                         sample_source,
                         processed_ids=set(),
@@ -531,7 +615,7 @@ class TestFetchNewVideosDateFallback:
 
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[entry_no_date]):
             with patch("src.fetchers.youtube._get_video_upload_date", return_value=None):
-                with patch("src.fetchers.youtube._get_transcript", return_value="text"):
+                with patch("src.fetchers.youtube._get_transcript", return_value=("text", ())):
                     result = fetch_new_videos(
                         sample_source,
                         processed_ids=set(),
@@ -555,7 +639,7 @@ class TestFetchNewVideosDateFallback:
 
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[old_entry_no_date]):
             with patch("src.fetchers.youtube._get_video_upload_date", return_value=real_date):
-                with patch("src.fetchers.youtube._get_transcript", return_value=None):
+                with patch("src.fetchers.youtube._get_transcript", return_value=(None, ())):
                     result = fetch_new_videos(
                         sample_source,
                         processed_ids=set(),

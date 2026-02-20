@@ -115,6 +115,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                     transcript=video.transcript,
                     duration_seconds=video.duration_seconds,
                     language=video.language,
+                    transcript_segments=video.transcript_segments,
                 )
             except QuotaExhaustedError as e:
                 logger.error("Daily Gemini quota exhausted — saving progress and stopping early")

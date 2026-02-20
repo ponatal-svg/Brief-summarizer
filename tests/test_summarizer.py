@@ -11,6 +11,7 @@ from src.summarizer import (
     summarize,
     _call_gemini,
     _format_duration_for_prompt,
+    _format_timestamp_index,
     _get_language_name,
     QuotaExhaustedError,
     SUMMARY_PROMPT,
@@ -371,3 +372,118 @@ class TestSummarize:
         calls = mock_client.models.generate_content.call_args_list
         prompt = calls[0].kwargs["contents"]
         assert "1h 0m" in prompt
+
+
+class TestFormatTimestampIndex:
+    """Tests for _format_timestamp_index()."""
+
+    def test_empty_segments_returns_none_available(self):
+        result = _format_timestamp_index(())
+        assert result == "(none available)"
+
+    def test_single_segment(self):
+        result = _format_timestamp_index(((0, "Hello world"),))
+        assert '[t=0s] "Hello world"' in result
+
+    def test_multiple_segments(self):
+        segments = ((0, "Intro text here"), (30, "Second segment now"), (60, "Final part"))
+        result = _format_timestamp_index(segments)
+        assert "[t=0s]" in result
+        assert "[t=30s]" in result
+        assert "[t=60s]" in result
+
+    def test_long_snippet_truncated_to_8_words(self):
+        long_text = "one two three four five six seven eight nine ten"
+        result = _format_timestamp_index(((5, long_text),))
+        assert "nine" not in result
+        assert "ten" not in result
+        assert "..." in result
+        assert "one two three four five six seven eight" in result
+
+    def test_short_snippet_not_truncated(self):
+        short_text = "just five words here"
+        result = _format_timestamp_index(((10, short_text),))
+        assert "..." not in result
+        assert short_text in result
+
+    def test_output_is_multiline_for_multiple_segments(self):
+        segments = ((0, "First"), (30, "Second"))
+        result = _format_timestamp_index(segments)
+        lines = result.strip().split("\n")
+        assert len(lines) == 2
+
+    def test_timestamp_format(self):
+        result = _format_timestamp_index(((142, "Some text"),))
+        assert "[t=142s]" in result
+
+
+class TestSummarizeWithTimestamps:
+    """Test that summarize() correctly includes timestamp index in prompt."""
+
+    @patch("src.summarizer.time.sleep")
+    def test_timestamp_index_included_in_prompt(self, mock_sleep):
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Summary with timestamps"
+        mock_client.models.generate_content.return_value = mock_response
+
+        segments = ((0, "Opening statement"), (30, "Key claim here"), (60, "Conclusion"))
+
+        summarize(
+            client=mock_client,
+            model="gemini-2.5-flash",
+            title="Test Video",
+            channel_name="Test Channel",
+            transcript="A " * 100,
+            duration_seconds=600,
+            transcript_segments=segments,
+        )
+
+        prompt = mock_client.models.generate_content.call_args.kwargs["contents"]
+        assert "[t=0s]" in prompt
+        assert "[t=30s]" in prompt
+        assert "[t=60s]" in prompt
+        assert "Opening statement" in prompt
+
+    @patch("src.summarizer.time.sleep")
+    def test_no_segments_shows_none_available(self, mock_sleep):
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Summary"
+        mock_client.models.generate_content.return_value = mock_response
+
+        summarize(
+            client=mock_client,
+            model="gemini-2.5-flash",
+            title="Test Video",
+            channel_name="Test Channel",
+            transcript="A " * 100,
+            duration_seconds=600,
+            transcript_segments=(),
+        )
+
+        prompt = mock_client.models.generate_content.call_args.kwargs["contents"]
+        assert "(none available)" in prompt
+
+    @patch("src.summarizer.time.sleep")
+    def test_segments_not_included_in_no_transcript_prompt(self, mock_sleep):
+        """Timestamp index must not appear in the no-transcript fallback prompt."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Placeholder"
+        mock_client.models.generate_content.return_value = mock_response
+
+        segments = ((0, "Should not appear"),)
+
+        summarize(
+            client=mock_client,
+            model="gemini-2.5-flash",
+            title="Test Video",
+            channel_name="Test Channel",
+            transcript=None,
+            transcript_segments=segments,
+        )
+
+        prompt = mock_client.models.generate_content.call_args.kwargs["contents"]
+        assert "Should not appear" not in prompt
+        assert "[t=" not in prompt

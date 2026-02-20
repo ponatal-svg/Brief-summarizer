@@ -45,6 +45,12 @@ Structure the summary using this architecture:
 ## Key Findings
 3-5 bullet points containing the core substance: data, specific numbers, unexpected results, and actionable insights. Only include numbers and version names that appear verbatim in the transcript.
 
+TIMESTAMP CITATIONS: A sparse index of the transcript is provided below (format: [t=Xs] "snippet...").
+For each Key Findings bullet, append the single most relevant timestamp citation in the format [t=Xs] at the END of the bullet, where X is the start time in seconds from the index. Choose the timestamp whose snippet best matches the content of that bullet. Only cite timestamps that are genuinely relevant — omit the citation if none fits well.
+
+Example bullet with citation:
+* Researchers found a 40% performance improvement on benchmark X. [t=142s]
+
 ## The So What?
 A concluding thought on how this fits into the broader landscape or what the viewer should do with this information.
 
@@ -57,6 +63,9 @@ Additional requirements:
 
 Video title: {title}
 Channel: {channel_name}
+
+Timestamp index (sparse, ~every 30s):
+{timestamp_index}
 
 Transcript:
 {transcript}"""
@@ -141,22 +150,27 @@ def summarize(
     transcript: Optional[str],
     duration_seconds: int = 0,
     language: str = "en",
+    transcript_segments: tuple = (),
 ) -> str:
     """Generate an adaptive summary for a video.
 
     Returns the summary text as a string.
     If transcript is None or too short, generates a placeholder based on title/channel.
+    transcript_segments is a tuple of (start_seconds, text) pairs used to inject
+    timestamp citations into Key Findings bullets.
     """
     language_name = _get_language_name(language)
 
     if transcript and len(transcript.strip()) > 50:
         duration_str = _format_duration_for_prompt(duration_seconds)
+        timestamp_index = _format_timestamp_index(transcript_segments)
         prompt = SUMMARY_PROMPT.format(
             transcript=transcript,
             duration_str=duration_str,
             title=title,
             channel_name=channel_name,
             language_name=language_name,
+            timestamp_index=timestamp_index,
         )
     else:
         prompt = NO_TRANSCRIPT_PROMPT.format(
@@ -165,6 +179,25 @@ def summarize(
         )
 
     return _call_gemini(client, model, prompt)
+
+
+def _format_timestamp_index(segments: tuple) -> str:
+    """Format transcript_segments into a compact index string for the prompt.
+
+    Each line: [t=Xs] "first ~8 words of the snippet..."
+    Returns "(none available)" if segments is empty.
+    """
+    if not segments:
+        return "(none available)"
+    lines = []
+    for start_sec, text in segments:
+        # Truncate to ~8 words for brevity
+        words = text.split()
+        snippet = " ".join(words[:8])
+        if len(words) > 8:
+            snippet += "..."
+        lines.append(f'[t={start_sec}s] "{snippet}"')
+    return "\n".join(lines)
 
 
 def _call_gemini(client: genai.Client, model: str, prompt: str) -> str:
