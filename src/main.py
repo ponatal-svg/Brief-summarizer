@@ -8,6 +8,13 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Load .env file if present (safe no-op if file doesn't exist)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from src.cleanup import cleanup_old_content, cleanup_state
 from src.config import load_config, ConfigError
 from src.fetchers.youtube import fetch_new_videos
