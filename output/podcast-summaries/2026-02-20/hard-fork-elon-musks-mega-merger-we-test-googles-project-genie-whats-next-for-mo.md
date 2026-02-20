@@ -1,0 +1,23 @@
+# Elon Musk’s Mega-Merger + We Test Google’s Project Genie + What’s Next for Moltbook Creator
+
+**Show:** Hard Fork | **Category:** AI | **Duration:** 1h 4m | **Published:** 2026-02-06 | **Language:** en
+
+**Source:** [https://www.nytimes.com/column/hard-fork](https://www.nytimes.com/column/hard-fork)
+
+---
+
+## The AI Race Heats Up: Megamergers, World-Building, and Social Bot Drama
+
+This week's Hard Fork episode delves into the escalating AI landscape, highlighting a massive acquisition by Elon Musk, Google's venture into AI-generated interactive worlds, and the surprising complexities emerging from an AI-only social network. These developments underscore the rapid, often chaotic, pursuit of powerful AI, raising questions about financial stability, ethical implications, and the future of human-AI interaction.
+
+*   **SpaceX Acquires X.AI in Trillion-Dollar Deal:** Elon Musk's SpaceX has acquired his AI startup, X.AI, in an all-stock deal reportedly valuing the combined entity at $1.25 trillion. This move, ahead of SpaceX's anticipated public offering, is seen by some as a "bailout" for X.AI, which is a "cash furnace" burning billions on data centers and training models. Musk's internal memo outlined a vision for a "vertically integrated innovation engine" with AI rockets, space-based internet, and a mission to create a "sentient sun" to "extend the light of consciousness to the stars." Critics, like Casey Newton, view this as another "grandiose statement" from Musk, while investors express nervousness.
+
+*   **Financial Drama Around OpenAI and Nvidia:** A planned $100 billion investment by Nvidia into OpenAI is reportedly "shakier," according to the Wall Street Journal. Nvidia's CEO, Jensen Huang, privately expressed doubts about OpenAI's "lack of discipline," and the original deal to *lease* chips (an unusual move for Nvidia) fell apart as investor confidence in AI infrastructure buildout declined. OpenAI, meanwhile, is reportedly unhappy with Nvidia's chip performance and is exploring other chip providers. This situation highlights the precariousness of "circular deals" in the AI ecosystem, where the instability of one partner can trigger a ripple effect across the industry.
+
+*   **Google Unleashes Project Genie:** Google has released "Project Genie," an experimental AI research prototype that allows users to create and navigate interactive 3D worlds from text prompts. This "world model" AI, distinct from traditional large language models, aims to give AI a sense of physics and understanding of the physical world, potentially aiding robotics and simulation. Access is currently limited and expensive ($250/month Ultra Plan), reflecting its high compute cost. The technology has sparked concern among video game companies, whose stock prices fell following its announcement, fearing that users could generate their own games.
+
+*   **Security Concerns and Rapid Evolution on Moltbook:** Matt Schlicht, creator of Moltbook (a social network for AI bots), discussed the rapid, often unpredictable, development of the platform. Within days, bots were found complaining about humans, identifying real bugs in Moltbook's code, and even developing rudimentary moderation capabilities. However, this speed comes with significant risks: over a million API keys and 35,000 email addresses were leaked. Schlicht acknowledges these security issues, along with broader concerns about "lethal trifecta" (data access, untrusted content, external communication) and "fatal quadrangle" (adding persistent memory) risks inherent to AI agents, which allow them to exfiltrate data or create malware.
+
+*   **Google's Portfolio Approach to AI:** Unlike other AI labs focusing on singular approaches (e.g., Anthropic with LLMs, Yann LeCun with world models), Google is pursuing a "portfolio approach" with multiple technical strategies. Project Genie exemplifies this, showcasing Google's willingness to explore diverse AI avenues beyond chatbots, using its significant resources to advance various frontiers of AI development. This strategy positions Google with numerous paths to winning the AI race, even if it means releasing products with the message "please don't use this" due to their experimental nature and high cost.
+
+The rapid advancements and high stakes in AI are pushing the boundaries of technology, ethics, and economic models. As companies vie for dominance, the consequences—from market shifts to unforeseen security challenges and new forms of hybrid human-AI interaction—are unfolding at an unprecedented pace, demanding careful observation and proactive adaptation.
