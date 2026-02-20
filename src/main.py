@@ -98,7 +98,13 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 continue
 
             if not video.transcript:
-                logger.warning(f"  No transcript for '{video.title}' — summarising from title only")
+                msg = f"No transcript available for '{video.title}' — skipping"
+                logger.warning(msg)
+                errors.append({
+                    "source": f"Transcript/{video.channel_name}",
+                    "message": msg,
+                })
+                continue
 
             try:
                 summary = summarize(

@@ -128,8 +128,8 @@ class TestYouTubePipeline:
                                                                 state_path=state_path,
                                                             )
 
-    def test_summarizes_video_without_transcript_using_title_only(self, tmp_path, config, sample_video):
-        """Videos with no transcript should be summarized via title-only prompt, not skipped."""
+    def test_skips_video_without_transcript(self, tmp_path, config, sample_video):
+        """Videos with no transcript are skipped — error logged, no Gemini call made."""
         no_transcript_video = VideoInfo(
             video_id="vid1", title="No Transcript",
             url="https://youtube.com/watch?v=vid1",
@@ -137,31 +137,26 @@ class TestYouTubePipeline:
             upload_date=datetime.now(timezone.utc), duration_seconds=600,
             transcript=None,
         )
-        mock_client = MagicMock()
 
         with patch("src.main.load_config", return_value=config):
-            with patch("src.main.create_client", return_value=mock_client):
+            with patch("src.main.create_client", return_value=MagicMock()):
                 with patch("src.main.fetch_new_videos", return_value=[no_transcript_video]):
                     with patch("src.main.fetch_new_episodes", return_value=[]):
-                        with patch("src.main.summarize", return_value="title-only summary") as mock_summarize:
-                            with patch("src.main.generate_summary_files", return_value={"summary_path": tmp_path / "s.md", "slug": "s"}):
-                                with patch("src.main.generate_daily_digest"):
-                                    with patch("src.main.generate_podcast_daily_digest"):
-                                        with patch("src.main.generate_error_report"):
-                                            with patch("src.main.generate_viewer"):
-                                                with patch("src.main.save_state"):
-                                                    with patch("src.main.cleanup_old_content", return_value=[]):
-                                                        with patch("src.main.cleanup_state"):
-                                                            run(
-                                                                config_path=tmp_path / "config.yaml",
-                                                                output_dir=tmp_path / "output",
-                                                                state_path=tmp_path / "state.json",
-                                                            )
+                        with patch("src.main.summarize") as mock_summarize:
+                            with patch("src.main.generate_daily_digest"):
+                                with patch("src.main.generate_podcast_daily_digest"):
+                                    with patch("src.main.generate_error_report"):
+                                        with patch("src.main.generate_viewer"):
+                                            with patch("src.main.save_state"):
+                                                with patch("src.main.cleanup_old_content", return_value=[]):
+                                                    with patch("src.main.cleanup_state"):
+                                                        run(
+                                                            config_path=tmp_path / "config.yaml",
+                                                            output_dir=tmp_path / "output",
+                                                            state_path=tmp_path / "state.json",
+                                                        )
 
-        # Should still call summarize — with transcript=None, which uses NO_TRANSCRIPT_PROMPT
-        mock_summarize.assert_called_once()
-        call_kwargs = mock_summarize.call_args[1]
-        assert call_kwargs["transcript"] is None
+        mock_summarize.assert_not_called()
 
     def test_youtube_fetch_error_logged_and_continues(self, tmp_path, config):
         with patch("src.main.load_config", return_value=config):

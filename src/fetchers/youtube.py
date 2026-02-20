@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -73,6 +74,7 @@ def fetch_new_videos(
             continue
 
         transcript, segments = _get_transcript(video_id, language=source.language)
+        time.sleep(5)  # pace caption API calls to avoid YouTube 429 rate-limiting
 
         video = VideoInfo(
             video_id=video_id,
@@ -100,6 +102,7 @@ def fetch_new_videos(
             if real_date:
                 upload_date = real_date
             transcript, segments = _get_transcript(video_id, language=source.language)
+            time.sleep(5)  # pace caption API calls to avoid YouTube 429 rate-limiting
             video = VideoInfo(
                 video_id=video_id,
                 title=latest.get("title", "Untitled"),
