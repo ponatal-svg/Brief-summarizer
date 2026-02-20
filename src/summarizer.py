@@ -70,19 +70,6 @@ Timestamp index (sparse, ~every 30s):
 Transcript:
 {transcript}"""
 
-NO_TRANSCRIPT_PROMPT = """You are a content summarizer. Based only on the video title and channel name below, write a brief placeholder note.
-
-Title: {title}
-Channel: {channel_name}
-
-Requirements:
-- Write the response in {language_name}
-- State what the video appears to be about based on the title
-- Note that no transcript was available for a full summary
-- Keep it to 2-3 sentences
-- Do NOT include any preamble"""
-
-
 def create_client(api_key: Optional[str] = None) -> genai.Client:
     """Create a Gemini API client."""
     key = api_key or os.environ.get("GEMINI_API_KEY")
@@ -147,37 +134,29 @@ def summarize(
     model: str,
     title: str,
     channel_name: str,
-    transcript: Optional[str],
+    transcript: str,
     duration_seconds: int = 0,
     language: str = "en",
     transcript_segments: tuple = (),
 ) -> str:
-    """Generate an adaptive summary for a video.
+    """Generate an adaptive summary for a video transcript.
 
-    Returns the summary text as a string.
-    If transcript is None or too short, generates a placeholder based on title/channel.
+    transcript must be a non-empty string — callers are responsible for
+    skipping videos with no transcript before calling this.
     transcript_segments is a tuple of (start_seconds, text) pairs used to inject
     timestamp citations into Key Findings bullets.
     """
     language_name = _get_language_name(language)
-
-    if transcript and len(transcript.strip()) > 50:
-        duration_str = _format_duration_for_prompt(duration_seconds)
-        timestamp_index = _format_timestamp_index(transcript_segments)
-        prompt = SUMMARY_PROMPT.format(
-            transcript=transcript,
-            duration_str=duration_str,
-            title=title,
-            channel_name=channel_name,
-            language_name=language_name,
-            timestamp_index=timestamp_index,
-        )
-    else:
-        prompt = NO_TRANSCRIPT_PROMPT.format(
-            title=title, channel_name=channel_name,
-            language_name=language_name,
-        )
-
+    duration_str = _format_duration_for_prompt(duration_seconds)
+    timestamp_index = _format_timestamp_index(transcript_segments)
+    prompt = SUMMARY_PROMPT.format(
+        transcript=transcript,
+        duration_str=duration_str,
+        title=title,
+        channel_name=channel_name,
+        language_name=language_name,
+        timestamp_index=timestamp_index,
+    )
     return _call_gemini(client, model, prompt)
 
 

@@ -15,7 +15,6 @@ from src.summarizer import (
     _get_language_name,
     QuotaExhaustedError,
     SUMMARY_PROMPT,
-    NO_TRANSCRIPT_PROMPT,
 )
 
 
@@ -294,66 +293,6 @@ class TestSummarize:
         assert "Spanish" in prompt
 
     @patch("src.summarizer.time.sleep")
-    def test_without_transcript(self, mock_sleep):
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.text = "Placeholder note"
-        mock_client.models.generate_content.return_value = mock_response
-
-        result = summarize(
-            client=mock_client,
-            model="gemini-2.5-flash",
-            title="Test Video",
-            channel_name="Test Channel",
-            transcript=None,
-        )
-
-        assert result == "Placeholder note"
-        calls = mock_client.models.generate_content.call_args_list
-        prompt = calls[0].kwargs["contents"]
-        assert "Test Video" in prompt
-        assert "Test Channel" in prompt
-        assert "English" in prompt  # default language in no-transcript prompt
-
-    @patch("src.summarizer.time.sleep")
-    def test_with_short_transcript_uses_no_transcript_prompt(self, mock_sleep):
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.text = "Placeholder"
-        mock_client.models.generate_content.return_value = mock_response
-
-        summarize(
-            client=mock_client,
-            model="gemini-2.5-flash",
-            title="Test",
-            channel_name="Channel",
-            transcript="too short",
-        )
-
-        calls = mock_client.models.generate_content.call_args_list
-        prompt = calls[0].kwargs["contents"]
-        assert "no transcript was available" in prompt
-
-    @patch("src.summarizer.time.sleep")
-    def test_with_empty_transcript(self, mock_sleep):
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.text = "Placeholder"
-        mock_client.models.generate_content.return_value = mock_response
-
-        summarize(
-            client=mock_client,
-            model="gemini-2.5-flash",
-            title="Test",
-            channel_name="Channel",
-            transcript="   ",
-        )
-
-        calls = mock_client.models.generate_content.call_args_list
-        prompt = calls[0].kwargs["contents"]
-        assert "no transcript was available" in prompt
-
-    @patch("src.summarizer.time.sleep")
     def test_prompt_includes_duration_context(self, mock_sleep):
         mock_client = MagicMock()
         mock_response = MagicMock()
@@ -465,25 +404,3 @@ class TestSummarizeWithTimestamps:
         prompt = mock_client.models.generate_content.call_args.kwargs["contents"]
         assert "(none available)" in prompt
 
-    @patch("src.summarizer.time.sleep")
-    def test_segments_not_included_in_no_transcript_prompt(self, mock_sleep):
-        """Timestamp index must not appear in the no-transcript fallback prompt."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.text = "Placeholder"
-        mock_client.models.generate_content.return_value = mock_response
-
-        segments = ((0, "Should not appear"),)
-
-        summarize(
-            client=mock_client,
-            model="gemini-2.5-flash",
-            title="Test Video",
-            channel_name="Test Channel",
-            transcript=None,
-            transcript_segments=segments,
-        )
-
-        prompt = mock_client.models.generate_content.call_args.kwargs["contents"]
-        assert "Should not appear" not in prompt
-        assert "[t=" not in prompt
