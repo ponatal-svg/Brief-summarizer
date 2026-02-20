@@ -521,6 +521,11 @@ def _download_direct(audio_url: str, output_path: str, max_bytes: int) -> None:
             if e.code in (429, 503) and attempt < MAX_RETRIES - 1:
                 time.sleep(RETRY_BACKOFF_SECONDS * (2 ** attempt))
                 continue
+            if e.code in (301, 302, 303, 307, 308):
+                raise AudioDownloadError(
+                    f"HTTP {e.code} redirect not followed for {audio_url}. "
+                    f"The episode audio URL may have moved or expired."
+                ) from e
             raise AudioDownloadError(
                 f"HTTP {e.code} downloading audio from {audio_url}. "
                 f"The episode URL may have expired or require authentication."

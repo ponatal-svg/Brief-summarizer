@@ -289,6 +289,22 @@ body {
   line-height: 1.7;
   color: var(--text-mid);
 }
+.ts-chip {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-light);
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-decoration: none;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s;
+}
+.ts-chip:hover { color: var(--text); border-color: var(--text-mid); }
 
 /* === FALLBACK SUMMARY STYLES === */
 .summary-fallback h1,
@@ -747,6 +763,10 @@ function parseSummaryMd(md, cardId) {
     if (currentSection === 'findings' && trimmed.startsWith('*')) {
       findings.push(trimmed.replace(/^\*\s*/, '').replace(/^\*\*(.+?):\*\*/, '<strong>$1:</strong>'));
     }
+    // Also accept lines starting with - as bullet points in findings
+    if (currentSection === 'findings' && trimmed.startsWith('-') && !trimmed.startsWith('--')) {
+      findings.push(trimmed.replace(/^-\s*/, '').replace(/^\*\*(.+?):\*\*/, '<strong>$1:</strong>'));
+    }
     if (currentSection === 'sowhat' && trimmed) soWhatText += trimmed + ' ';
   }
 
@@ -772,15 +792,6 @@ function parseSummaryMd(md, cardId) {
     if (hookEl) hookEl.textContent = hookText.trim();
   }
 
-  /* Key Findings with numbered rows */
-  if (findings.length) {
-    html += '<div class="section-label">Key Findings</div>';
-    for (var j = 0; j < findings.length; j++) {
-      var num = String(j + 1).padStart(2, '0');
-      html += '<div class="finding"><span class="finding-num">' + num + '</span><span>' + findings[j] + '</span></div>';
-    }
-  }
-
   /* So What */
   if (soWhatText) {
     html += '<div class="so-what-section"><div class="section-label">So What</div>';
@@ -791,6 +802,32 @@ function parseSummaryMd(md, cardId) {
   var watchUrl = '';
   var sourceMatch = md.match(/\*\*Source:\*\*\s*\[([^\]]+)\]\(([^)]+)\)/);
   if (sourceMatch) watchUrl = sourceMatch[2];
+
+  /* Extract video ID for timestamp links (YouTube only) */
+  var videoId = '';
+  var vidIdMatch = watchUrl.match(/[?&]v=([A-Za-z0-9_-]+)/);
+  if (vidIdMatch) videoId = vidIdMatch[1];
+
+  /* Render Key Findings — convert [t=NNs] markers to clickable timestamp chips */
+  if (findings.length) {
+    html += '<div class="section-label">Key Findings</div>';
+    for (var j = 0; j < findings.length; j++) {
+      var num = String(j + 1).padStart(2, '0');
+      var findingHtml = findings[j];
+      /* Replace [t=NNs] with a clickable ▶ MM:SS chip if we have a video ID */
+      findingHtml = findingHtml.replace(/\[t=(\d+)s\]/g, function(match, secs) {
+        var s = parseInt(secs, 10);
+        var mm = Math.floor(s / 60);
+        var ss = String(s % 60).padStart(2, '0');
+        var label = '\u25b6\ufe0e ' + mm + ':' + ss;
+        if (videoId) {
+          return '<a href="https://www.youtube.com/watch?v=' + videoId + '&t=' + s + '" target="_blank" class="ts-chip">' + label + '</a>';
+        }
+        return '<span class="ts-chip">' + label + '</span>';
+      });
+      html += '<div class="finding"><span class="finding-num">' + num + '</span><span>' + findingHtml + '</span></div>';
+    }
+  }
 
   /* Extract language from metadata */
   var langMatch = md.match(/\*\*Language:\*\*\s*(\S+)/);

@@ -8,6 +8,13 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Load .env file if present (safe no-op if file doesn't exist)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from src.cleanup import cleanup_old_content, cleanup_state
 from src.config import load_config, ConfigError
 from src.fetchers.youtube import fetch_new_videos
@@ -115,6 +122,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                     transcript=video.transcript,
                     duration_seconds=video.duration_seconds,
                     language=video.language,
+                    transcript_segments=video.transcript_segments,
                 )
             except QuotaExhaustedError as e:
                 logger.error("Daily Gemini quota exhausted — saving progress and stopping early")
@@ -134,7 +142,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 msg = f"Summarization failed for '{video.title}': {e}"
                 logger.error(msg)
                 errors.append({"source": f"Gemini/{video.channel_name}", "message": msg})
-                digest_entries.append({"video": video, "paths": None, "error": str(e)})
+                # Do not add to digest_entries — errors stay in logs, not on the UI
                 continue
 
             try:
@@ -201,7 +209,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 msg = str(e)
                 logger.error(f"  Transcription failed for '{episode.title}': {msg}")
                 errors.append({"source": f"Podcast/Transcription/{show.name}", "message": msg})
-                podcast_entries.append({"episode": episode, "paths": None, "error": msg})
+                # Do not add to podcast_entries — errors stay in logs, not on the UI
                 continue
             except Exception as e:
                 error_str = str(e).lower()
@@ -213,7 +221,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 msg = f"Processing failed for '{episode.title}': {e}"
                 logger.error(msg)
                 errors.append({"source": f"Podcast/{show.name}", "message": msg})
-                podcast_entries.append({"episode": episode, "paths": None, "error": str(e)})
+                # Do not add to podcast_entries — errors stay in logs, not on the UI
                 continue
 
             try:
