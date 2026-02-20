@@ -189,6 +189,17 @@ class TestGetTranscript:
         assert text is None
         assert segments == ()
 
+    def test_ip_blocked_returns_none_gracefully(self):
+        """IpBlocked (YouTube blocking our IP) should return None, not raise."""
+        from youtube_transcript_api._errors import IpBlocked
+
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = IpBlocked("abc123")
+            text, segments = _get_transcript("abc123")
+
+        assert text is None
+        assert segments == ()
+
     def test_no_transcript_found_falls_back_to_list(self):
         from youtube_transcript_api._errors import NoTranscriptFound
 

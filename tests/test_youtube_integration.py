@@ -7,9 +7,11 @@ They are SKIPPED by default and must be run explicitly with:
 
 Design principles to avoid IP bans / rate-limiting:
 - Only ONE real channel is queried per test class (AI Explained — public, active).
-- Transcript fetching (YouTubeTranscriptApi) is NEVER called live here;
-  it's mocked out. The unit tests in test_youtube.py cover that path.
+- Transcript fetching (YouTubeTranscriptApi) is NEVER called live here for the
+  pipeline tests; it's mocked out. The unit tests in test_youtube.py cover that path.
 - yt-dlp calls are kept to a minimum: 1 channel list + 1 video-date lookup.
+- TestTranscriptApiHealth runs a live transcript fetch as a canary — it is the
+  authoritative check for "is YouTube caption access working right now?"
 
 Prerequisites:
 - Internet access
@@ -171,3 +173,46 @@ class TestFetchNewVideosLive:
         # latest video was processed — result is either empty or a different video
         for v in videos:
             assert v.video_id != latest_id
+
+
+@pytest.mark.integration
+class TestTranscriptApiHealth:
+    """Canary test: actually fetches a live transcript.
+
+    This is the FIRST test to run when diagnosing YouTube issues.
+    Distinguishes between:
+    - IpBlocked  → YouTube has blocked this IP; refresh cookies.txt or wait
+    - TranscriptsDisabled → this specific video has no captions
+    - library version breakage → list() works but fetch() raises unexpectedly
+
+    Uses a stable, old video ("Me at the zoo") unlikely to be taken down.
+    """
+
+    # First YouTube video (2005), very stable, has auto-generated captions
+    STABLE_VIDEO_ID = "jNQXAC9IVRw"
+
+    def test_can_fetch_transcript_text(self):
+        """Primary canary: fetch() returns non-empty text."""
+        from src.fetchers.youtube import _get_transcript
+
+        text, segs = _get_transcript(self.STABLE_VIDEO_ID)
+
+        assert text is not None, (
+            "Transcript fetch returned None — YouTube may be blocking this IP. "
+            "Run: python3 -m pytest tests/test_youtube_integration.py --integration -v -k health "
+            "to see the raw exception."
+        )
+        assert len(text) > 10, "Transcript text is suspiciously short"
+        assert isinstance(segs, tuple), "Segments should be a tuple"
+
+    def test_library_version_is_current(self):
+        """Guard against silent breakage when youtube-transcript-api releases new versions."""
+        import importlib.metadata
+        from packaging.version import Version
+
+        installed = Version(importlib.metadata.version("youtube-transcript-api"))
+        minimum = Version("1.2.4")
+        assert installed >= minimum, (
+            f"youtube-transcript-api {installed} is older than minimum {minimum}. "
+            "Run: pip install --upgrade youtube-transcript-api"
+        )
