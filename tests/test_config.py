@@ -36,7 +36,7 @@ def valid_raw_config():
         },
         "settings": {
             "max_age_days": 7,
-            "gemini_model": "gemini-2.0-flash",
+            "gemini_model": "gemini-2.5-flash",
             "max_videos_per_channel": 3,
             "lookback_hours": 26,
             "max_episodes_per_show": 3,
@@ -187,7 +187,7 @@ class TestParseSettings:
         }
         config = _parse_config(raw)
         assert config.settings.max_age_days == 7
-        assert config.settings.gemini_model == "gemini-2.0-flash"
+        assert config.settings.gemini_model == "gemini-2.5-flash"
         assert config.settings.max_videos_per_channel == 3
         assert config.settings.lookback_hours == 26
 

@@ -3,12 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Morning Brief · Podcasts</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Morning Brief</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
   --bg: #F7F7F5;
   --surface: #FFFFFF;
@@ -17,26 +14,28 @@
   --text-light: #999999;
   --border: #E5E5E5;
   --hover: #F0EFED;
-  --accent: #9B59B6;   /* podcast purple — only used for structural accents */
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1A1917; --surface: #242320; --text: #E5E4E0;
-    --text-mid: #A8A6A0; --text-light: #6B6963;
-    --border: #333230; --hover: #2C2B28;
+    --bg: #1A1917;
+    --surface: #242320;
+    --text: #E5E4E0;
+    --text-mid: #A8A6A0;
+    --text-light: #6B6963;
+    --border: #333230;
+    --hover: #2C2B28;
   }
 }
-
+* { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: 'DM Sans', -apple-system, sans-serif;
-  font-size: 15px;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
   line-height: 1.6;
-  min-height: 100vh;
 }
 
-/* === ROW 1: HEADER — back link + title + date pills === */
+/* === ROW 1: HEADER — title + date pills === */
 .header {
   max-width: 1000px;
   margin: 0 auto;
@@ -47,13 +46,13 @@ body {
   flex-wrap: wrap;
 }
 .back-link {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 400;
-  color: var(--text-light);
+  color: var(--text-mid);
   text-decoration: none;
   flex-shrink: 0;
   transition: color 0.12s ease;
+  line-height: 1;
 }
 .back-link:hover { color: var(--text); }
 .header h1 {
@@ -73,20 +72,11 @@ body {
   flex-wrap: wrap;
   align-items: center;
 }
-.date-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 5px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-mid);
-  cursor: pointer;
-  transition: all 0.15s ease;
+
+/* === DATE NAV === */
+.date-nav {
+  display: none;
 }
-.date-btn:hover { background: var(--hover); border-color: var(--text-light); }
-.date-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
 
 /* === ROW 2: TOOLBAR — category filters + expand all === */
 .toolbar {
@@ -105,6 +95,29 @@ body {
   gap: 6px;
   flex-wrap: wrap;
 }
+.toolbar-sep {
+  display: none;
+}
+.date-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.date-btn:hover { background: var(--hover); border-color: var(--text-light); }
+.date-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+.filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .filter-btn {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -120,6 +133,7 @@ body {
 }
 .filter-btn:hover { background: var(--hover); border-color: var(--text-light); }
 .filter-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+
 .expand-all-btn {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -139,9 +153,14 @@ body {
 .expand-all-btn .arrow { display: inline-block; transition: transform 0.2s; font-size: 13px; }
 .expand-all-btn.expanded .arrow { transform: rotate(90deg); }
 
-/* === DIVIDER + COUNT === */
-.divider { max-width: 1000px; margin: 16px auto 0; padding: 0 32px; }
+.divider {
+  max-width: 1000px;
+  margin: 16px auto 0;
+  padding: 0 32px;
+}
 .divider hr { border: none; height: 1px; background: var(--border); }
+
+/* === SUMMARY COUNT === */
 .summary-count {
   max-width: 1000px;
   margin: 0 auto;
@@ -151,311 +170,728 @@ body {
   color: var(--text-light);
 }
 
-/* ── Cards — same structure as YouTube viewer ── */
-.cards {
+/* === CARDS === */
+.grid {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 0 32px 48px;
+  padding: 4px 32px 80px;
 }
-
 .card {
-  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  gap: 0;
   padding: 28px 0;
-  display: flex;
-  gap: 12px;
-  cursor: pointer;
+  border-bottom: 1px solid var(--border);
 }
-.card:last-child { border-bottom: none; }
-
-/* Left accent bar — color per category, same as YouTube viewer */
 .card-accent {
-  width: 4px;
   border-radius: 2px;
-  flex-shrink: 0;
-  align-self: stretch;
-  min-height: 60px;
+  margin-top: 4px;
+  height: 20px;
 }
-
-.card-body { flex: 1; min-width: 0; }
-
-/* Show name + artwork row */
-.card-show {
+.card-content { padding-left: 20px; }
+.card-top {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
-.card-artwork {
-  width: 40px; height: 40px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--hover);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  overflow: hidden;
-}
-.card-show-meta {}
-.card-show-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-mid);
-  line-height: 1.2;
-}
-.card-show-detail {
-  font-size: 11px;
-  color: var(--text-light);
-}
-
 .card-tag {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  text-transform: uppercase;
+  font-weight: 500;
   letter-spacing: 0.5px;
-  background: var(--hover);
+  text-transform: uppercase;
   padding: 2px 8px;
   border-radius: 3px;
-  display: inline-block;
-  margin-bottom: 8px;
-  color: var(--text-mid);
-}
-.card-title {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  line-height: 1.35;
-  margin-bottom: 6px;
+  background: var(--hover);
 }
 .card-source {
   font-size: 13px;
   color: var(--text-light);
-  margin-bottom: 10px;
+}
+.card-duration {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
+  color: var(--text-light);
+}
+.card-title {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
 }
 .card-hook {
   font-size: 14px;
-  color: var(--text-mid);
   line-height: 1.6;
-  margin-bottom: 12px;
+  color: var(--text-mid);
 }
+.card-expand {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-light);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  transition: color 0.15s;
+}
+.card-expand:hover { color: var(--text); }
+.card-expand .arrow {
+  display: inline-block;
+  transition: transform 0.2s;
+  font-size: 14px;
+}
+.card.open .card-expand .arrow { transform: rotate(90deg); }
+.card.open .card-expand .label-text { }
 
-/* Key findings — identical to YouTube viewer */
-.card-findings { margin-top: 14px; }
-.card-findings-label {
+/* === EXPANDED SUMMARY === */
+.card-body {
+  display: none;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.card.open .card-body { display: block; }
+.section-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
   color: var(--text-light);
   margin-bottom: 10px;
 }
 .finding {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 0;
+  margin-bottom: 10px;
   font-size: 14px;
   line-height: 1.6;
-  color: var(--text-mid);
+  color: var(--text);
 }
 .finding-num {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-light);
-  flex-shrink: 0;
-  min-width: 20px;
-  margin-top: 3px;
+  padding-top: 3px;
+}
+.so-what-section { margin-top: 20px; }
+.so-what-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-mid);
 }
 
-/* TTS row — same as YouTube */
-.card-tts {
+/* === FALLBACK SUMMARY STYLES === */
+.summary-fallback h1,
+.summary-fallback h2,
+.summary-fallback h3 { margin: 0.75rem 0 0.25rem; font-size: 1rem; font-weight: 600; }
+.summary-fallback p { margin-bottom: 0.5rem; font-size: 14px; line-height: 1.6; color: var(--text); }
+.summary-fallback ul, .summary-fallback ol { margin: 0.5rem 0 0.5rem 1.5rem; font-size: 14px; }
+.summary-fallback strong { font-weight: 600; }
+
+.card-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
 }
-.tts-btn {
+.action-link {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 3px 8px;
-  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text-light);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.action-link:hover { color: var(--text); }
+.listen-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-light);
   border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: none;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+}
+.listen-btn:hover { background: var(--hover); color: var(--text); }
+.listen-btn.playing { background: #e74c3c; color: #fff; border-color: #e74c3c; }
+
+/* === TTS SPEED === */
+.tts-controls {
+  display: none;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+}
+.tts-controls.visible { display: flex; }
+.tts-speed-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   color: var(--text-light);
+  letter-spacing: 0.5px;
+  margin-right: 2px;
+}
+.speed-btn {
+  font-family: 'JetBrains Mono', monospace;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
   background: transparent;
-  transition: all 0.12s ease;
-}
-.tts-btn:hover { color: var(--text); background: var(--hover); }
-.tts-listen {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text-light);
+  color: var(--text-mid);
+  border-radius: 4px;
   cursor: pointer;
-  transition: color 0.12s;
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  font-size: 10px;
+  transition: all 0.15s;
 }
-.tts-listen:hover { color: var(--text); }
-.tts-spacer { flex: 1; }
+.speed-btn:hover { background: var(--hover); }
+.speed-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 
-/* Collapsed card arrow */
-.card-expand {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+/* === STATES === */
+.empty {
+  text-align: center;
   color: var(--text-light);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  transition: color 0.12s;
+  padding: 3rem;
+  font-size: 14px;
 }
-.card-expand:hover { color: var(--text); }
+.error-text {
+  font-family: 'JetBrains Mono', monospace;
+  color: #e74c3c;
+  font-size: 12px;
+  font-style: italic;
+}
+#loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-light);
+  font-size: 14px;
+}
 
+/* === RESPONSIVE === */
 @media (max-width: 640px) {
   .header { padding: 28px 16px 0; flex-direction: column; gap: 4px; }
-  .toolbar { padding: 12px 16px 0; }
-  .divider, .summary-count { padding-left: 16px; padding-right: 16px; }
-  .cards { padding-left: 16px; padding-right: 16px; }
+  .toolbar { padding: 16px; }
+  .toolbar-left { gap: 4px; }
+  .toolbar-sep { display: none; }
+  .divider { padding: 0 16px; }
+  .summary-count { padding: 10px 16px 0; }
+  .grid { padding: 0 16px 60px; }
   .card-title { font-size: 17px; }
+  .card-duration { display: none; }
 }
 </style>
 </head>
 <body>
-
 <header class="header">
   <a class="back-link" href="index.html" title="Back to Morning Brief">←</a>
   <h1>Morning Brief<span>/ podcasts</span></h1>
-  <div class="date-pills">
-    <button class="date-btn active">Feb 19</button>
-    <button class="date-btn">Feb 18</button>
-    <button class="date-btn">Feb 17</button>
-  </div>
+  <div class="date-pills" id="dateButtons"></div>
 </header>
+
+<nav class="date-nav" id="dateNav"></nav>
 
 <div class="toolbar">
   <div class="toolbar-left">
-    <button class="filter-btn active">all</button>
-    <button class="filter-btn">tech</button>
-    <button class="filter-btn">health</button>
-    <button class="filter-btn">business</button>
+    <div class="filters" id="filters"></div>
   </div>
-  <button class="expand-all-btn">
-    <span class="arrow">→</span> <span>expand all</span>
+  <button class="expand-all-btn" id="expandAllBtn" onclick="toggleExpandAll()">
+    <span class="arrow">&rarr;</span> <span class="label-text">expand all</span>
   </button>
 </div>
 
 <div class="divider"><hr></div>
-<div class="summary-count">3 summaries</div>
+<div class="summary-count"><span id="visibleCount">0</span> summaries</div>
 
-<!-- ── Cards ── -->
-<div class="cards">
-
-  <!-- Card 1 — Lex Fridman, expanded -->
-  <div class="card">
-    <div class="card-accent" style="background:#4A90D9"></div>
-    <div class="card-body">
-
-      <div class="card-show">
-        <div class="card-artwork">🎙</div>
-        <div class="card-show-meta">
-          <div class="card-show-name">Lex Fridman Podcast</div>
-          <div class="card-show-detail">Episode #452 · Feb 19, 2026</div>
-        </div>
-      </div>
-
-      <span class="card-tag">Tech</span>
-      <div class="card-title">Sam Altman on the Future of AGI, OpenAI's Roadmap &amp; What Scares Him</div>
-      <div class="card-source">2h 14m · spotify</div>
-      <div class="card-hook">A rare long-form conversation where Altman is unusually candid — on timelines, on what keeps him up at night, and on why he thinks the transition to AGI matters more than any product OpenAI will ship.</div>
-
-      <div class="card-findings">
-        <div class="card-findings-label">Key Findings</div>
-        <div class="finding">
-          <span class="finding-num">01</span>
-          <span>Altman believes AGI is achievable within this decade and that OpenAI is "closer than most people think" — but refuses to give a year.</span>
-        </div>
-        <div class="finding">
-          <span class="finding-num">02</span>
-          <span>He frames the biggest risk not as misalignment but as concentration of power — including OpenAI itself having too much control.</span>
-        </div>
-        <div class="finding">
-          <span class="finding-num">03</span>
-          <span>On o-series reasoning models: "We didn't fully understand why they worked until after they shipped." Admits the field is moving faster than the theory.</span>
-        </div>
-        <div class="finding">
-          <span class="finding-num">04</span>
-          <span>Discussed the departure of key safety researchers — says OpenAI's safety culture is "strong" but acknowledges "reasonable people disagree."</span>
-        </div>
-      </div>
-
-      <div class="card-tts">
-        <span class="tts-listen">▶ Listen</span>
-        <div class="tts-spacer"></div>
-        <span class="tts-btn">1.0×</span>
-        <span class="tts-btn">1.2×</span>
-        <span class="tts-btn">1.5×</span>
-        <span class="tts-btn">2.0×</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Card 2 — Huberman Lab -->
-  <div class="card">
-    <div class="card-accent" style="background:#27AE60"></div>
-    <div class="card-body">
-
-      <div class="card-show">
-        <div class="card-artwork">🧠</div>
-        <div class="card-show-meta">
-          <div class="card-show-name">Huberman Lab</div>
-          <div class="card-show-detail">Episode #231 · Feb 19, 2026</div>
-        </div>
-      </div>
-
-      <span class="card-tag">Health</span>
-      <div class="card-title">Why Sleep Is the Best Performance Drug You're Not Taking Seriously</div>
-      <div class="card-source">1h 48m · spotify</div>
-      <div class="card-hook">Huberman and guest Matthew Walker revisit the science of sleep with new research — specifically around REM deprivation and its effects on emotional regulation, memory consolidation, and metabolic health.</div>
-
-      <div class="card-tts" style="border-top:1px solid var(--border); padding-top:12px; margin-top:14px; display:flex; align-items:center; gap:8px;">
-        <span class="card-expand">↓ Expand</span>
-        <div class="tts-spacer"></div>
-        <span class="tts-listen">▶ Listen</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Card 3 — How I Built This -->
-  <div class="card">
-    <div class="card-accent" style="background:#E67E22"></div>
-    <div class="card-body">
-
-      <div class="card-show">
-        <div class="card-artwork">🏗</div>
-        <div class="card-show-meta">
-          <div class="card-show-name">How I Built This</div>
-          <div class="card-show-detail">Feb 19, 2026</div>
-        </div>
-      </div>
-
-      <span class="card-tag">Business</span>
-      <div class="card-title">The Startup That Beat Google at Search — What We Can Learn</div>
-      <div class="card-source">52m · rss</div>
-      <div class="card-hook">Guy Raz interviews the founder of Perplexity AI on how a tiny team built a product that millions use instead of Google — and the counterintuitive product decisions that got them there.</div>
-
-      <div class="card-tts" style="border-top:1px solid var(--border); padding-top:12px; margin-top:14px; display:flex; align-items:center; gap:8px;">
-        <span class="card-expand">↓ Expand</span>
-        <div class="tts-spacer"></div>
-        <span class="tts-listen">▶ Listen</span>
-      </div>
-    </div>
-  </div>
-
+<div class="grid" id="content">
+  <div id="loading">loading...</div>
 </div>
+
+<script>
+/* ===== STATE ===== */
+var CATEGORIES = {};
+var DIGEST_INDEX = [];
+var currentDate = '';
+var currentFilter = 'all';
+var allExpanded = false;
+var currentUtterance = null;
+var currentSpeed = 1.0;
+
+/* ===== MARKDOWN PARSER ===== */
+function md2html(md) {
+  if (!md) return '';
+  var html = md
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  html = html.split('\n').map(function(line) {
+    line = line.trim();
+    if (!line) return '';
+    if (line.startsWith('<h') || line.startsWith('<ul') || line.startsWith('<li') ||
+        line.startsWith('<blockquote') || line.startsWith('---')) return line;
+    return '<p>' + line + '</p>';
+  }).join('\n');
+  return html;
+}
+
+/* ===== TTS ===== */
+function stopTTS() {
+  window.speechSynthesis.cancel();
+  currentUtterance = null;
+  document.querySelectorAll('.listen-btn.playing').forEach(function(b) {
+    b.classList.remove('playing');
+    b.innerHTML = '\u25B6 listen';
+  });
+}
+
+function speakText(text, btn, lang) {
+  stopTTS();
+  var utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = currentSpeed;
+  if (lang) utterance.lang = lang;
+  utterance.onend = function() {
+    btn.classList.remove('playing');
+    btn.innerHTML = '\u25B6 listen';
+    currentUtterance = null;
+  };
+  currentUtterance = utterance;
+  btn.classList.add('playing');
+  btn.innerHTML = '\u25A0 stop';
+  window.speechSynthesis.speak(utterance);
+}
+
+function setSpeed(speed, cardId) {
+  currentSpeed = speed;
+  /* Highlight the active speed button in the relevant card (or all cards) */
+  var scope = cardId ? document.getElementById('tts-' + cardId) : document;
+  if (!scope) scope = document;
+  scope.querySelectorAll('.speed-btn').forEach(function(b) {
+    b.classList.toggle('active', parseFloat(b.dataset.speed) === speed);
+  });
+  /* If currently speaking, restart with new speed */
+  if (currentUtterance) {
+    var text = currentUtterance.text;
+    var lang = currentUtterance.lang;
+    var playingBtn = document.querySelector('.listen-btn.playing');
+    if (playingBtn) speakText(text, playingBtn, lang);
+  }
+}
+
+/* ===== INIT ===== */
+async function init() {
+  try {
+    var catResp = await fetch('categories.json');
+    CATEGORIES = catResp.ok ? await catResp.json() : {};
+  } catch(e) { CATEGORIES = {}; }
+
+  try {
+    var idxResp = await fetch('podcast-index.json');
+    DIGEST_INDEX = idxResp.ok ? await idxResp.json() : [];
+  } catch(e) { DIGEST_INDEX = []; }
+
+  DIGEST_INDEX = DIGEST_INDEX.sort().reverse();
+
+  if (DIGEST_INDEX.length === 0) {
+    document.getElementById('content').innerHTML =
+      '<div class="empty">No podcast episodes available yet. Run the pipeline first.</div>';
+    return;
+  }
+
+  var nav = document.getElementById('dateButtons');
+  DIGEST_INDEX.forEach(function(d, i) {
+    var btn = document.createElement('button');
+    btn.className = 'date-btn' + (i === 0 ? ' active' : '');
+    btn.dataset.date = d;
+    // Display MM/DD — compact enough to fit 7 buttons in a row
+    var parts = d.split('-');
+    btn.textContent = parts[1] + '/' + parts[2];
+    btn.title = d;  // full date on hover
+    btn.onclick = function() { loadDate(d); };
+    nav.appendChild(btn);
+  });
+
+  buildFilters();
+  loadDate(DIGEST_INDEX[0]);
+}
+
+function buildFilters() {
+  var container = document.getElementById('filters');
+  container.innerHTML = '';
+
+  var allBtn = document.createElement('button');
+  allBtn.className = 'filter-btn active';
+  allBtn.dataset.cat = 'all';
+  allBtn.textContent = 'all';
+  allBtn.onclick = function() { applyFilter('all'); };
+  container.appendChild(allBtn);
+
+  Object.keys(CATEGORIES).forEach(function(name) {
+    var btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.dataset.cat = name;
+    btn.textContent = name.toLowerCase();
+    btn.onclick = function() { applyFilter(name); };
+    container.appendChild(btn);
+  });
+}
+
+/* ===== DATE LOADING ===== */
+async function loadDate(dateStr) {
+  currentDate = dateStr;
+  allExpanded = false;
+  updateExpandBtn();
+  stopTTS();
+
+  document.querySelectorAll('.date-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.date === dateStr);
+  });
+
+  var content = document.getElementById('content');
+  content.innerHTML = '<div id="loading">loading...</div>';
+
+  try {
+    var resp = await fetch('podcast-daily/' + dateStr + '.md');
+    if (!resp.ok) throw new Error('Not found');
+    var md = await resp.text();
+    renderDigest(md, dateStr);
+  } catch(e) {
+    content.innerHTML = '<div class="empty">No digest for ' + dateStr + '</div>';
+  }
+}
+
+/* ===== DIGEST RENDERER ===== */
+function renderDigest(md, dateStr) {
+  var content = document.getElementById('content');
+  var lines = md.split('\n');
+  var html = '';
+  var currentCategory = null;
+  var currentCard = null;
+  var cardCount = 0;
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+
+    if (line.startsWith('## ')) {
+      if (currentCard) { html += closeCard(currentCard, cardCount); currentCard = null; }
+      currentCategory = line.substring(3).trim();
+
+    } else if (line.startsWith('### ')) {
+      if (currentCard) { html += closeCard(currentCard, cardCount); }
+      cardCount++;
+      var title = line.substring(4).trim();
+      var color = currentCategory ? (CATEGORIES[currentCategory] || '#888') : '#888';
+      currentCard = { title: title, id: cardCount, category: currentCategory, color: color, channel: '', duration: '', language: 'en', summaryPath: '' };
+      html += '<div class="card" id="card-' + cardCount + '" data-cat="' + (currentCategory || '') + '">';
+      html += '<div class="card-accent" style="background:' + color + '"></div>';
+      html += '<div class="card-content">';
+      html += '<div class="card-top">';
+      html += '<span class="card-tag" style="color:' + color + '">' + (currentCategory || '').toUpperCase() + '</span>';
+
+    } else if (currentCard && line.startsWith('**') && line.includes('|')) {
+      var parts = line.replace(/\*\*/g, '').split('|').map(function(s) { return s.trim(); });
+      var channel = parts[0] || '';
+      var duration = parts[1] || '';
+      var pubDate = parts[2] || '';
+      currentCard.channel = channel;
+      currentCard.duration = duration;
+
+      var metaParts = [channel];
+      if (duration) metaParts.push(duration);
+      if (pubDate && pubDate.length === 10 && pubDate[4] === '-') {
+        var pd = new Date(pubDate + 'T00:00:00');
+        var formatted = pd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        metaParts.push(formatted);
+      }
+      html += '<span class="card-source">' + metaParts.join(' · ') + '</span>';
+      html += '</div>';
+      html += '<h3 class="card-title">' + currentCard.title + '</h3>';
+
+    } else if (currentCard && line.includes('[Summary]')) {
+      // Extract the path from [Summary](path) and store on the card
+      var summaryMatch = line.match(/\[Summary\]\(([^)]+)\)/);
+      if (summaryMatch) currentCard.summaryPath = summaryMatch[1];
+      html += '<button class="card-expand" onclick="toggleSummary(' + cardCount + ')">';
+      html += '<span class="arrow">\u2192</span> <span class="label-text">read summary</span></button>';
+
+    } else if (currentCard && line.includes('Error:')) {
+      html += '<span class="error-text">' + line.replace('>', '').trim() + '</span>';
+    }
+  }
+  if (currentCard) html += closeCard(currentCard, cardCount);
+
+  if (cardCount === 0) {
+    content.innerHTML = '<div class="empty">No new content for ' + dateStr + '.</div>';
+  } else {
+    content.innerHTML = html;
+    applyFilter(currentFilter);
+  }
+}
+
+function closeCard(card, id) {
+  var h = '';
+  h += '<div class="card-body" id="body-' + id + '"';
+  h += ' data-title="' + card.title.replace(/"/g, '&quot;') + '"';
+  h += ' data-channel="' + card.channel.replace(/"/g, '&quot;') + '"';
+  h += ' data-duration="' + card.duration.replace(/"/g, '&quot;') + '"';
+  h += ' data-language="' + (card.language || 'en') + '"';
+  if (card.summaryPath) h += ' data-summary-path="' + card.summaryPath + '"';
+  h += '></div>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+/* ===== EXPAND / COLLAPSE ===== */
+async function toggleSummary(id) {
+  var card = document.getElementById('card-' + id);
+  var body = document.getElementById('body-' + id);
+  var expandBtn = card.querySelector('.card-expand');
+
+  if (card.classList.contains('open')) {
+    card.classList.remove('open');
+    if (expandBtn) expandBtn.querySelector('.label-text').textContent = 'read summary';
+    stopTTS();
+    return;
+  }
+
+  if (!body.dataset.loaded) {
+    // Prefer the path embedded in the digest markdown; fall back to slug reconstruction
+    var summaryPath = body.dataset.summaryPath ||
+      ('podcast-summaries/' + currentDate + '/' + findSlugForCard(id) + '.md');
+    try {
+      var resp = await fetch(summaryPath);
+      if (!resp.ok) throw new Error('Not found');
+      var md = await resp.text();
+      body.innerHTML = parseSummaryMd(md, id);
+      body.dataset.loaded = 'true';
+
+      /* Build TTS text: title + channel, then Key Findings + So What only */
+      var title = body.dataset.title || '';
+      var channel = body.dataset.channel || '';
+      var tsParts = md.split('---');
+      var summaryMd = tsParts.length > 2 ? tsParts.slice(2).join('---') : md;
+      var ttsIntro = title;
+      if (channel) ttsIntro += ', by ' + channel;
+      ttsIntro += '. ';
+      /* Extract only Key Findings and So What sections for TTS */
+      var ttsBody = extractTTSBody(summaryMd);
+      /* Strip markdown syntax and URLs from TTS text */
+      var plainBody = ttsBody
+        .replace(/https?:\/\/[^\s)]+/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/[#*\[\]()>]/g, '')
+        .replace(/\n+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      body.dataset.plainText = ttsIntro + plainBody;
+    } catch(e) {
+      body.innerHTML = '<span class="error-text">Could not load summary.</span>';
+    }
+  }
+
+  card.classList.add('open');
+  if (expandBtn) expandBtn.querySelector('.label-text').textContent = 'collapse';
+}
+
+function extractTTSBody(summaryMd) {
+  /* Extract only Key Findings and So What sections, skip Hook/metadata */
+  var lines = summaryMd.split('\n');
+  var result = '';
+  var currentSection = '';
+  for (var i = 0; i < lines.length; i++) {
+    var trimmed = lines[i].trim();
+    if (trimmed === '## The Hook') { currentSection = 'hook'; continue; }
+    if (trimmed === '## Key Findings') { currentSection = 'findings'; result += 'Key findings. '; continue; }
+    if (trimmed === '## The So What?' || trimmed === '## The So What') { currentSection = 'sowhat'; result += 'So what. '; continue; }
+    if ((currentSection === 'findings' || currentSection === 'sowhat') && trimmed) {
+      result += trimmed + ' ';
+    }
+  }
+  return result || summaryMd;
+}
+
+function parseSummaryMd(md, cardId) {
+  var parts = md.split('---');
+  var summaryMd = parts.length > 2 ? parts.slice(2).join('---') : md;
+
+  var hookText = '';
+  var findings = [];
+  var soWhatText = '';
+  var currentSection = '';
+
+  var lines = summaryMd.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var trimmed = lines[i].trim();
+    if (trimmed === '## The Hook') { currentSection = 'hook'; continue; }
+    if (trimmed === '## Key Findings') { currentSection = 'findings'; continue; }
+    if (trimmed === '## The So What?' || trimmed === '## The So What') { currentSection = 'sowhat'; continue; }
+
+    if (currentSection === 'hook' && trimmed) hookText += trimmed + ' ';
+    if (currentSection === 'findings' && trimmed.startsWith('*')) {
+      findings.push(trimmed.replace(/^\*\s*/, '').replace(/^\*\*(.+?):\*\*/, '<strong>$1:</strong>'));
+    }
+    if (currentSection === 'sowhat' && trimmed) soWhatText += trimmed + ' ';
+  }
+
+  /* Fall back to raw markdown if structure not detected */
+  if (!hookText && !findings.length && !soWhatText) {
+    return '<div class="summary-fallback">' + md2html(summaryMd) + '</div>';
+  }
+
+  var html = '';
+
+  /* Inject hook text into the card as a preview */
+  var cardEl = document.getElementById('card-' + cardId);
+  if (cardEl && hookText) {
+    var hookEl = cardEl.querySelector('.card-hook');
+    if (!hookEl) {
+      var titleEl = cardEl.querySelector('.card-title');
+      if (titleEl) {
+        hookEl = document.createElement('p');
+        hookEl.className = 'card-hook';
+        titleEl.after(hookEl);
+      }
+    }
+    if (hookEl) hookEl.textContent = hookText.trim();
+  }
+
+  /* Key Findings with numbered rows */
+  if (findings.length) {
+    html += '<div class="section-label">Key Findings</div>';
+    for (var j = 0; j < findings.length; j++) {
+      var num = String(j + 1).padStart(2, '0');
+      html += '<div class="finding"><span class="finding-num">' + num + '</span><span>' + findings[j] + '</span></div>';
+    }
+  }
+
+  /* So What */
+  if (soWhatText) {
+    html += '<div class="so-what-section"><div class="section-label">So What</div>';
+    html += '<p class="so-what-text">' + soWhatText.trim() + '</p></div>';
+  }
+
+  /* Extract watch URL from metadata */
+  var watchUrl = '';
+  var sourceMatch = md.match(/\*\*Source:\*\*\s*\[([^\]]+)\]\(([^)]+)\)/);
+  if (sourceMatch) watchUrl = sourceMatch[2];
+
+  /* Extract language from metadata */
+  var langMatch = md.match(/\*\*Language:\*\*\s*(\S+)/);
+  var summaryLang = langMatch ? langMatch[1] : 'en';
+  /* Store language on the card body for TTS */
+  var bodyEl = document.getElementById('body-' + cardId);
+  if (bodyEl) bodyEl.dataset.language = summaryLang;
+
+  /* Actions: source link + listen button */
+  html += '<div class="card-actions">';
+  if (watchUrl) html += '<a href="' + watchUrl + '" target="_blank" class="action-link">source \u2197</a>';
+  html += '<button class="listen-btn" onclick="toggleTTS(' + cardId + ')">\u25B6 listen</button>';
+  html += '</div>';
+
+  /* TTS speed controls: 4 speeds */
+  html += '<div class="tts-controls" id="tts-' + cardId + '">';
+  html += '<span class="tts-speed-label">speed</span>';
+  [1.0, 1.2, 1.5, 2.0].forEach(function(s) {
+    var isActive = s === currentSpeed ? ' active' : '';
+    html += '<button class="speed-btn' + isActive + '" data-speed="' + s + '" onclick="setSpeed(' + s + ',' + cardId + ')">' + s + 'x</button>';
+  });
+  html += '</div>';
+
+  return html;
+}
+
+function toggleTTS(id) {
+  var body = document.getElementById('body-' + id);
+  var btn = body ? body.querySelector('.listen-btn') : null;
+  var ttsControls = document.getElementById('tts-' + id);
+  if (!body || !body.dataset.plainText || !btn) return;
+
+  if (currentUtterance && btn.classList.contains('playing')) {
+    stopTTS();
+    if (ttsControls) ttsControls.classList.remove('visible');
+  } else {
+    var lang = body.dataset.language || 'en';
+    speakText(body.dataset.plainText, btn, lang);
+    if (ttsControls) ttsControls.classList.add('visible');
+  }
+}
+
+/* ===== FILTER ===== */
+function applyFilter(cat) {
+  currentFilter = cat;
+  document.querySelectorAll('.filter-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.cat === cat);
+  });
+  var count = 0;
+  document.querySelectorAll('.card').forEach(function(c) {
+    var show = cat === 'all' || c.dataset.cat === cat;
+    c.style.display = show ? '' : 'none';
+    if (show) count++;
+  });
+  var countEl = document.getElementById('visibleCount');
+  if (countEl) countEl.textContent = count;
+}
+
+/* ===== EXPAND ALL / COLLAPSE ALL ===== */
+async function toggleExpandAll() {
+  allExpanded = !allExpanded;
+  updateExpandBtn();
+
+  var cards = document.querySelectorAll('.card');
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    if (card.style.display === 'none') continue;
+    var id = parseInt(card.id.replace('card-', ''));
+    if (allExpanded && !card.classList.contains('open')) {
+      await toggleSummary(id);
+    } else if (!allExpanded && card.classList.contains('open')) {
+      card.classList.remove('open');
+      var expandBtn = card.querySelector('.card-expand');
+      if (expandBtn) expandBtn.querySelector('.label-text').textContent = 'read summary';
+    }
+  }
+  if (!allExpanded) stopTTS();
+}
+
+function updateExpandBtn() {
+  var btn = document.getElementById('expandAllBtn');
+  if (!btn) return;
+  btn.classList.toggle('expanded', allExpanded);
+  btn.querySelector('.label-text').textContent = allExpanded ? 'collapse all' : 'expand all';
+}
+
+/* ===== SLUG ===== */
+function findSlugForCard(id) {
+  var card = document.getElementById('card-' + id);
+  var title = card.querySelector('.card-title').textContent;
+  return title.toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 80)
+    .replace(/^-|-$/g, '');
+}
+
+/* ===== BOOT ===== */
+init();
+document.addEventListener('DOMContentLoaded', function() { setSpeed(1.0, null); });
+</script>
 </body>
 </html>

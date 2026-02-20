@@ -32,7 +32,7 @@ def config():
         ],
         settings=Settings(
             max_age_days=7,
-            gemini_model="gemini-2.0-flash",
+            gemini_model="gemini-2.5-flash",
             max_videos_per_channel=3,
             lookback_hours=26,
             max_episodes_per_show=3,

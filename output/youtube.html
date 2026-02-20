@@ -46,13 +46,13 @@ body {
   flex-wrap: wrap;
 }
 .back-link {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 400;
-  color: var(--text-light);
+  color: var(--text-mid);
   text-decoration: none;
   flex-shrink: 0;
   transition: color 0.12s ease;
+  line-height: 1;
 }
 .back-link:hover { color: var(--text); }
 .header h1 {
@@ -102,13 +102,14 @@ body {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 500;
-  padding: 5px 12px;
+  padding: 4px 9px;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-mid);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 .date-btn:hover { background: var(--hover); border-color: var(--text-light); }
 .date-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); }
@@ -413,7 +414,6 @@ body {
 <div class="divider"><hr></div>
 <div class="summary-count"><span id="visibleCount">0</span> summaries</div>
 
-
 <div class="grid" id="content">
   <div id="loading">loading...</div>
 </div>
@@ -518,7 +518,11 @@ async function init() {
   DIGEST_INDEX.forEach(function(d, i) {
     var btn = document.createElement('button');
     btn.className = 'date-btn' + (i === 0 ? ' active' : '');
-    btn.textContent = d;
+    btn.dataset.date = d;
+    // Display MM/DD — compact enough to fit 7 buttons in a row
+    var parts = d.split('-');
+    btn.textContent = parts[1] + '/' + parts[2];
+    btn.title = d;  // full date on hover
     btn.onclick = function() { loadDate(d); };
     nav.appendChild(btn);
   });
@@ -556,7 +560,7 @@ async function loadDate(dateStr) {
   stopTTS();
 
   document.querySelectorAll('.date-btn').forEach(function(b) {
-    b.classList.toggle('active', b.textContent === dateStr);
+    b.classList.toggle('active', b.dataset.date === dateStr);
   });
 
   var content = document.getElementById('content');
@@ -593,7 +597,7 @@ function renderDigest(md, dateStr) {
       cardCount++;
       var title = line.substring(4).trim();
       var color = currentCategory ? (CATEGORIES[currentCategory] || '#888') : '#888';
-      currentCard = { title: title, id: cardCount, category: currentCategory, color: color, channel: '', duration: '', language: 'en' };
+      currentCard = { title: title, id: cardCount, category: currentCategory, color: color, channel: '', duration: '', language: 'en', summaryPath: '' };
       html += '<div class="card" id="card-' + cardCount + '" data-cat="' + (currentCategory || '') + '">';
       html += '<div class="card-accent" style="background:' + color + '"></div>';
       html += '<div class="card-content">';
@@ -620,6 +624,9 @@ function renderDigest(md, dateStr) {
       html += '<h3 class="card-title">' + currentCard.title + '</h3>';
 
     } else if (currentCard && line.includes('[Summary]')) {
+      // Extract the path from [Summary](path) and store on the card
+      var summaryMatch = line.match(/\[Summary\]\(([^)]+)\)/);
+      if (summaryMatch) currentCard.summaryPath = summaryMatch[1];
       html += '<button class="card-expand" onclick="toggleSummary(' + cardCount + ')">';
       html += '<span class="arrow">\u2192</span> <span class="label-text">read summary</span></button>';
 
@@ -629,8 +636,12 @@ function renderDigest(md, dateStr) {
   }
   if (currentCard) html += closeCard(currentCard, cardCount);
 
-  content.innerHTML = html;
-  applyFilter(currentFilter);
+  if (cardCount === 0) {
+    content.innerHTML = '<div class="empty">No new content for ' + dateStr + '.</div>';
+  } else {
+    content.innerHTML = html;
+    applyFilter(currentFilter);
+  }
 }
 
 function closeCard(card, id) {
@@ -640,6 +651,7 @@ function closeCard(card, id) {
   h += ' data-channel="' + card.channel.replace(/"/g, '&quot;') + '"';
   h += ' data-duration="' + card.duration.replace(/"/g, '&quot;') + '"';
   h += ' data-language="' + (card.language || 'en') + '"';
+  if (card.summaryPath) h += ' data-summary-path="' + card.summaryPath + '"';
   h += '></div>';
   h += '</div>';
   h += '</div>';
@@ -660,8 +672,9 @@ async function toggleSummary(id) {
   }
 
   if (!body.dataset.loaded) {
-    var slug = findSlugForCard(id);
-    var summaryPath = 'summaries/' + currentDate + '/' + slug + '.md';
+    // Prefer the path embedded in the digest markdown; fall back to slug reconstruction
+    var summaryPath = body.dataset.summaryPath ||
+      ('summaries/' + currentDate + '/' + findSlugForCard(id) + '.md');
     try {
       var resp = await fetch(summaryPath);
       if (!resp.ok) throw new Error('Not found');
