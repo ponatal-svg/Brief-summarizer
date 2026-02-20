@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
@@ -19,6 +20,23 @@ from src.fetchers.youtube import (
     _is_within_lookback,
     _sample_segments,
 )
+
+
+# ---------------------------------------------------------------------------
+# Helper: fake snippet objects matching youtube-transcript-api v1.x dataclass
+# ---------------------------------------------------------------------------
+
+@dataclass
+class FakeSnippet:
+    """Mimics youtube_transcript_api._transcripts.FetchedTranscriptSnippet."""
+    text: str
+    start: float
+    duration: float = 1.0
+
+
+def make_snippets(*items):
+    """Build a list of FakeSnippet from (text, start) pairs."""
+    return [FakeSnippet(text=t, start=s) for t, s in items]
 
 
 @pytest.fixture
@@ -88,17 +106,13 @@ class TestSampleSegments:
         assert _sample_segments([]) == ()
 
     def test_single_snippet(self):
-        raw = [{"text": "Hello world", "start": 0.0, "duration": 2.0}]
+        raw = make_snippets(("Hello world", 0.0))
         result = _sample_segments(raw)
         assert result == ((0, "Hello world"),)
 
     def test_samples_every_30s_by_default(self):
         # 3 snippets: 0s, 15s, 30s — only 0s and 30s should be sampled
-        raw = [
-            {"text": "First", "start": 0.0, "duration": 5.0},
-            {"text": "Middle", "start": 15.0, "duration": 5.0},
-            {"text": "Third", "start": 30.0, "duration": 5.0},
-        ]
+        raw = make_snippets(("First", 0.0), ("Middle", 15.0), ("Third", 30.0))
         result = _sample_segments(raw)
         starts = [s for s, _ in result]
         assert 0 in starts
@@ -106,11 +120,7 @@ class TestSampleSegments:
         assert 15 not in starts
 
     def test_custom_interval(self):
-        raw = [
-            {"text": "A", "start": 0.0, "duration": 2.0},
-            {"text": "B", "start": 10.0, "duration": 2.0},
-            {"text": "C", "start": 20.0, "duration": 2.0},
-        ]
+        raw = make_snippets(("A", 0.0), ("B", 10.0), ("C", 20.0))
         result = _sample_segments(raw, interval_seconds=10)
         starts = [s for s, _ in result]
         assert 0 in starts
@@ -118,25 +128,21 @@ class TestSampleSegments:
         assert 20 in starts
 
     def test_returns_tuple_of_tuples(self):
-        raw = [{"text": "Hi", "start": 5.0, "duration": 1.0}]
+        raw = make_snippets(("Hi", 5.0))
         result = _sample_segments(raw)
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
         assert result[0] == (5, "Hi")
 
     def test_skips_empty_text(self):
-        raw = [
-            {"text": "", "start": 0.0, "duration": 1.0},
-            {"text": "   ", "start": 1.0, "duration": 1.0},
-            {"text": "Real text", "start": 2.0, "duration": 1.0},
-        ]
+        raw = make_snippets(("", 0.0), ("   ", 1.0), ("Real text", 2.0))
         result = _sample_segments(raw)
         # Only "Real text" has non-empty text and falls in the first window
         assert len(result) == 1
         assert result[0][1] == "Real text"
 
     def test_start_seconds_are_integers(self):
-        raw = [{"text": "Test", "start": 12.7, "duration": 1.0}]
+        raw = make_snippets(("Test", 12.7))
         result = _sample_segments(raw)
         assert isinstance(result[0][0], int)
         assert result[0][0] == 12
@@ -145,28 +151,26 @@ class TestSampleSegments:
 class TestGetTranscript:
     """Tests for _get_transcript().
 
-    Patches YouTubeTranscriptApi class methods (get_transcript / list_transcripts).
-    Snippets are plain dicts: {"text": str, "start": float, "duration": float}.
-    Now returns (text, segments) tuple.
+    Patches the module-level _yta instance (youtube-transcript-api v1.x).
+    Snippets are FakeSnippet dataclass objects with .text and .start attributes.
+    Returns (text, segments) tuple.
     """
 
     def test_successful_fetch_returns_text(self):
-        snippets = [{"text": "Hello", "start": 0.0, "duration": 1.0},
-                    {"text": "world", "start": 1.0, "duration": 1.0}]
+        snippets = make_snippets(("Hello", 0.0), ("world", 1.0))
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   return_value=snippets) as mock_get:
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.return_value = snippets
             text, segments = _get_transcript("abc123")
 
         assert text == "Hello world"
-        mock_get.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
 
     def test_successful_fetch_returns_segments(self):
-        snippets = [{"text": "Hello", "start": 0.0, "duration": 1.0},
-                    {"text": "world", "start": 45.0, "duration": 1.0}]
+        snippets = make_snippets(("Hello", 0.0), ("world", 45.0))
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   return_value=snippets):
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.return_value = snippets
             text, segments = _get_transcript("abc123")
 
         assert isinstance(segments, tuple)
@@ -178,8 +182,8 @@ class TestGetTranscript:
     def test_no_transcript_available(self):
         from youtube_transcript_api._errors import TranscriptsDisabled
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   side_effect=TranscriptsDisabled("abc123")):
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = TranscriptsDisabled("abc123")
             text, segments = _get_transcript("abc123")
 
         assert text is None
@@ -188,16 +192,15 @@ class TestGetTranscript:
     def test_no_transcript_found_falls_back_to_list(self):
         from youtube_transcript_api._errors import NoTranscriptFound
 
-        snippets = [{"text": "Hola", "start": 0.0, "duration": 1.0}]
+        snippets = make_snippets(("Hola", 0.0))
         mock_transcript = MagicMock()
         mock_transcript.language_code = "es"
         mock_transcript.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   side_effect=NoTranscriptFound("abc123", [], [])):
-            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
-                       return_value=[mock_transcript]):
-                text, segments = _get_transcript("abc123")
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
+            mock_yta.list.return_value = [mock_transcript]
+            text, segments = _get_transcript("abc123")
 
         assert text == "Hola"
         assert isinstance(segments, tuple)
@@ -205,41 +208,39 @@ class TestGetTranscript:
     def test_video_unavailable(self):
         from youtube_transcript_api._errors import VideoUnavailable
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   side_effect=VideoUnavailable("abc123")):
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = VideoUnavailable("abc123")
             text, segments = _get_transcript("abc123")
 
         assert text is None
         assert segments == ()
 
     def test_generic_error_falls_back_to_list(self):
-        """A generic error on get_transcript tries list_transcripts next."""
-        snippets = [{"text": "fallback", "start": 0.0, "duration": 1.0}]
+        """A generic error on fetch() tries list() next."""
+        snippets = make_snippets(("fallback", 0.0))
         mock_transcript = MagicMock()
         mock_transcript.language_code = "en"
         mock_transcript.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   side_effect=RuntimeError("network error")):
-            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
-                       return_value=[mock_transcript]):
-                text, segments = _get_transcript("abc123")
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = RuntimeError("network error")
+            mock_yta.list.return_value = [mock_transcript]
+            text, segments = _get_transcript("abc123")
 
         assert text == "fallback"
 
     def test_both_attempts_fail_returns_none(self):
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   side_effect=RuntimeError("fail")):
-            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
-                       side_effect=RuntimeError("also fail")):
-                text, segments = _get_transcript("abc123")
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = RuntimeError("fail")
+            mock_yta.list.side_effect = RuntimeError("also fail")
+            text, segments = _get_transcript("abc123")
 
         assert text is None
         assert segments == ()
 
     def test_empty_transcript_returns_none(self):
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   return_value=[]):
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.return_value = []
             text, segments = _get_transcript("abc123")
 
         assert text is None
@@ -459,61 +460,59 @@ class TestFetchNewVideos:
 
 class TestGetTranscriptLanguage:
     def test_english_default_languages(self):
-        snippets = [{"text": "Hello", "start": 0.0, "duration": 1.0}]
+        snippets = make_snippets(("Hello", 0.0))
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   return_value=snippets) as mock_get:
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.return_value = snippets
             _get_transcript("abc123", language="en")
 
-        mock_get.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
 
     def test_spanish_language_priority(self):
-        snippets = [{"text": "Hola", "start": 0.0, "duration": 1.0}]
+        snippets = make_snippets(("Hola", 0.0))
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   return_value=snippets) as mock_get:
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.return_value = snippets
             text, _ = _get_transcript("abc123", language="es")
 
-        mock_get.assert_called_once_with("abc123", languages=["es", "en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_once_with("abc123", languages=["es", "en", "en-US", "en-GB"])
         assert text == "Hola"
 
     def test_hebrew_language_priority(self):
-        snippets = [{"text": "שלום", "start": 0.0, "duration": 1.0}]
+        snippets = make_snippets(("שלום", 0.0))
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   return_value=snippets) as mock_get:
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.return_value = snippets
             text, _ = _get_transcript("abc123", language="he")
 
-        mock_get.assert_called_once_with("abc123", languages=["he", "en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_once_with("abc123", languages=["he", "en", "en-US", "en-GB"])
         assert text == "שלום"
 
     def test_falls_back_to_any_available_language(self):
         """When preferred languages fail, should try listing all transcripts."""
         from youtube_transcript_api._errors import NoTranscriptFound
 
-        snippets = [{"text": "Hola mundo", "start": 0.0, "duration": 1.0}]
+        snippets = make_snippets(("Hola mundo", 0.0))
         mock_transcript_obj = MagicMock()
         mock_transcript_obj.language_code = "es"
         mock_transcript_obj.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   side_effect=NoTranscriptFound("abc123", [], [])):
-            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
-                       return_value=[mock_transcript_obj]) as mock_list:
-                text, _ = _get_transcript("abc123", language="es")
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
+            mock_yta.list.return_value = [mock_transcript_obj]
+            text, _ = _get_transcript("abc123", language="es")
 
         assert text == "Hola mundo"
-        mock_list.assert_called_once_with("abc123")
+        mock_yta.list.assert_called_once_with("abc123")
 
     def test_fallback_returns_none_when_no_transcripts_at_all(self):
         """When no transcripts exist at all, should return None gracefully."""
         from youtube_transcript_api._errors import NoTranscriptFound
 
-        with patch("src.fetchers.youtube.YouTubeTranscriptApi.get_transcript",
-                   side_effect=NoTranscriptFound("abc123", [], [])):
-            with patch("src.fetchers.youtube.YouTubeTranscriptApi.list_transcripts",
-                       return_value=[]):
-                text, segments = _get_transcript("abc123", language="es")
+        with patch("src.fetchers.youtube._yta") as mock_yta:
+            mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
+            mock_yta.list.return_value = []
+            text, segments = _get_transcript("abc123", language="es")
 
         assert text is None
         assert segments == ()

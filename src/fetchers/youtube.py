@@ -10,12 +10,40 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import http.cookiejar
+from pathlib import Path
+
+import requests
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     TranscriptsDisabled,
     NoTranscriptFound,
     VideoUnavailable,
+    IpBlocked,
 )
+
+
+def _make_yta() -> YouTubeTranscriptApi:
+    """Create a YouTubeTranscriptApi instance, loading cookies.txt if present.
+
+    cookies.txt (Netscape format, exportable via browser extension) helps bypass
+    YouTube IP blocks by authenticating requests with a real browser session.
+    """
+    cookies_path = Path(__file__).parent.parent.parent / "cookies.txt"
+    if cookies_path.exists():
+        jar = http.cookiejar.MozillaCookieJar(str(cookies_path))
+        try:
+            jar.load(ignore_discard=True, ignore_expires=True)
+            session = requests.Session()
+            session.cookies = jar
+            return YouTubeTranscriptApi(http_client=session)
+        except Exception:
+            pass  # Fall through to cookieless instance
+    return YouTubeTranscriptApi()
+
+
+# v1.x uses an instance-based API; create a module-level singleton
+_yta = _make_yta()
 
 from src.config import YouTubeSource
 
@@ -182,10 +210,13 @@ def _get_transcript(video_id: str, language: str = "en") -> tuple:
 
     # First attempt: try preferred languages
     try:
-        raw = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
-        text = " ".join(snippet["text"] for snippet in raw)
+        raw = _yta.fetch(video_id, languages=languages)
+        text = " ".join(snippet.text for snippet in raw)
         if text.strip():
             return text, _sample_segments(raw)
+    except IpBlocked:
+        logger.warning(f"  YouTube IP block detected — refresh cookies.txt to restore access")
+        return None, ()
     except (TranscriptsDisabled, VideoUnavailable):
         logger.info(f"  No transcript available for {video_id}")
         return None, ()
@@ -196,13 +227,13 @@ def _get_transcript(video_id: str, language: str = "en") -> tuple:
 
     # Second attempt: try ANY available transcript language
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        transcript_list = _yta.list(video_id)
         available = list(transcript_list)
         if available:
             first = available[0]
             logger.info(f"  Falling back to transcript language: {first.language_code} for {video_id}")
             raw = first.fetch()
-            text = " ".join(snippet["text"] for snippet in raw)
+            text = " ".join(snippet.text for snippet in raw)
             if text.strip():
                 return text, _sample_segments(raw)
     except Exception as e:
@@ -224,9 +255,10 @@ def _sample_segments(raw: list, interval_seconds: int = 30) -> tuple:
     samples = []
     next_threshold = 0.0
     for snippet in raw:
-        start = float(snippet.get("start", 0))
+        # v1.x returns dataclass objects (snippet.start, snippet.text)
+        start = float(snippet.start)
         if start >= next_threshold:
-            text = snippet.get("text", "").strip()
+            text = snippet.text.strip() if snippet.text else ""
             if text:
                 samples.append((int(start), text))
                 next_threshold = start + interval_seconds

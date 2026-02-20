@@ -1,5 +1,5 @@
 yt-dlp>=2024.0.0
-youtube-transcript-api>=1.0.0
+youtube-transcript-api>=1.2.4
 google-genai>=1.0.0
 pyyaml>=6.0
 jinja2>=3.1
