@@ -912,19 +912,30 @@ function toggleTTS(id) {
 }
 
 /* ===== FILTER ===== */
-function applyFilter(cat) {
+async function applyFilter(cat) {
   currentFilter = cat;
   document.querySelectorAll('.filter-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.cat === cat);
   });
   var count = 0;
+  var toExpand = [];
   document.querySelectorAll('.card').forEach(function(c) {
     var show = cat === 'all' || c.dataset.cat === cat;
     c.style.display = show ? '' : 'none';
-    if (show) count++;
+    if (show) {
+      count++;
+      // If "expand all" is active, newly-visible cards that aren't open yet need expanding
+      if (allExpanded && !c.classList.contains('open')) {
+        toExpand.push(parseInt(c.id.replace('card-', '')));
+      }
+    }
   });
   var countEl = document.getElementById('visibleCount');
   if (countEl) countEl.textContent = count;
+  // Expand cards that were hidden during the previous toggleExpandAll call
+  for (var i = 0; i < toExpand.length; i++) {
+    await toggleSummary(toExpand[i]);
+  }
 }
 
 /* ===== EXPAND ALL / COLLAPSE ALL ===== */

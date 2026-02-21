@@ -321,6 +321,34 @@ class TestFilter:
         assert "'filter-btn active'" in generated_html
         assert "textContent = 'all'" in generated_html
 
+    def test_apply_filter_is_async(self, generated_html):
+        # applyFilter must be async so it can await toggleSummary for newly-visible cards
+        assert "async function applyFilter(" in generated_html
+
+    def test_filter_expands_newly_visible_cards_when_all_expanded(self, generated_html):
+        # When allExpanded is true and a new filter reveals hidden cards, those cards
+        # must be expanded — they were skipped during toggleExpandAll because display=none
+        fn_start = generated_html.index("async function applyFilter(")
+        fn_body = generated_html[fn_start:fn_start + 1500]
+        assert "allExpanded" in fn_body
+        assert "toExpand" in fn_body
+        assert "toggleSummary" in fn_body
+
+    def test_filter_only_expands_unopened_cards(self, generated_html):
+        # Must check !c.classList.contains('open') before queuing expansion
+        # to avoid double-toggling cards that are already open
+        fn_start = generated_html.index("async function applyFilter(")
+        fn_body = generated_html[fn_start:fn_start + 1500]
+        assert "classList.contains('open')" in fn_body
+
+    def test_filter_expand_respects_hidden_cards(self, generated_html):
+        # Hidden cards (display=none) must NOT be added to the expand queue
+        fn_start = generated_html.index("async function applyFilter(")
+        fn_body = generated_html[fn_start:fn_start + 1500]
+        # The toExpand push is inside the `if (show)` block
+        assert "if (show)" in fn_body
+        assert "toExpand.push" in fn_body
+
 
 # ===== DATE NAVIGATION =====
 
