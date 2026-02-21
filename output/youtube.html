@@ -447,6 +447,20 @@ var currentSpeed = 1.0;
 /* ===== MARKDOWN PARSER ===== */
 function md2html(md) {
   if (!md) return '';
+  /* Strip legacy [[t=NNs]](url) before generic link processing so only the chip remains */
+  md = md.replace(/\[\[t=(\d+)s\]\]\([^)]*\)/g, function(match, secs) {
+    var s = parseInt(secs, 10);
+    var mm = Math.floor(s / 60);
+    var ss = String(s % 60).padStart(2, '0');
+    return '<span class="ts-chip">\u25b6\ufe0e ' + mm + ':' + ss + '</span>';
+  });
+  /* Convert remaining raw [t=NNs] markers (new format) to chips */
+  md = md.replace(/\[t=(\d+)s\]/g, function(match, secs) {
+    var s = parseInt(secs, 10);
+    var mm = Math.floor(s / 60);
+    var ss = String(s % 60).padStart(2, '0');
+    return '<span class="ts-chip">\u25b6\ufe0e ' + mm + ':' + ss + '</span>';
+  });
   var html = md
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
@@ -838,7 +852,10 @@ function parseSummaryMd(md, cardId) {
     for (var j = 0; j < findings.length; j++) {
       var num = String(j + 1).padStart(2, '0');
       var findingHtml = findings[j];
-      /* Replace [t=NNs] with a clickable ▶ MM:SS chip if we have a video ID */
+      /* Strip legacy [[t=NNs]](url) markdown links — generated before viewer handled chips.
+         Both patterns are collapsed to a raw [t=NNs] marker first, then converted below. */
+      findingHtml = findingHtml.replace(/\[\[t=(\d+)s\]\]\([^)]*\)/g, '[t=$1s]');
+      /* Replace [t=NNs] with a clickable ▶ MM:SS chip */
       findingHtml = findingHtml.replace(/\[t=(\d+)s\]/g, function(match, secs) {
         var s = parseInt(secs, 10);
         var mm = Math.floor(s / 60);

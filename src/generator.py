@@ -97,12 +97,8 @@ def _build_summary_md(
     duration_str: str,
 ) -> str:
     """Build markdown content for a YouTube summary file."""
-    # Convert [t=Xs] markers to clickable YouTube timestamp links
-    linked_summary = re.sub(
-        r"\[t=(\d+)s\]",
-        lambda m: f"[[t={m.group(1)}s]](https://www.youtube.com/watch?v={video.video_id}&t={m.group(1)})",
-        summary_text,
-    )
+    # Keep [t=Xs] markers raw — the viewer converts them to clickable timestamp
+    # chips (▶ MM:SS) using the video ID extracted from the Source line.
     lines = [
         f"# {video.title}",
         "",
@@ -115,7 +111,7 @@ def _build_summary_md(
         "",
         f"---",
         "",
-        linked_summary,
+        summary_text,
         "",
     ]
     return "\n".join(lines)

@@ -502,3 +502,65 @@ class TestGeneratePodcastDailyDigest:
         # Both old and new should be present
         assert "Old Episode" in content
         assert "New Episode" in content
+
+
+# ===== TIMESTAMP MARKERS =====
+
+class TestTimestampMarkersInSummary:
+    """Generator must store raw [t=Xs] markers in .md files.
+    The viewer converts them to clickable ▶ MM:SS chips — the generator
+    must not pre-convert them to [[t=Xs]](url) markdown links.
+    """
+
+    def test_raw_marker_preserved_in_output(self, tmp_path, sample_video):
+        summary = "## Key Findings\n- Finding one [t=278s]\n- Finding two [t=463s]"
+        result = generate_summary_files(
+            video=sample_video,
+            summary=summary,
+            output_dir=tmp_path,
+            date_str="2026-02-16",
+        )
+        content = result["summary_path"].read_text()
+        assert "[t=278s]" in content
+        assert "[t=463s]" in content
+
+    def test_no_markdown_link_wrapping(self, tmp_path, sample_video):
+        """Generator must NOT convert [t=Xs] to [[t=Xs]](url) — that
+        would show both the chip text and the URL in the viewer."""
+        summary = "## Key Findings\n- Finding [t=100s]"
+        result = generate_summary_files(
+            video=sample_video,
+            summary=summary,
+            output_dir=tmp_path,
+            date_str="2026-02-16",
+        )
+        content = result["summary_path"].read_text()
+        # Must NOT contain the old [[t=Xs]](url) pattern
+        assert "[[t=" not in content
+        # The marker itself must not be wrapped in a markdown link (url immediately after ](
+        import re
+        assert not re.search(r"\[t=\d+s\]\]\(https?://", content)
+
+    def test_marker_not_duplicated(self, tmp_path, sample_video):
+        summary = "## Key Findings\n- Finding [t=60s]"
+        result = generate_summary_files(
+            video=sample_video,
+            summary=summary,
+            output_dir=tmp_path,
+            date_str="2026-02-16",
+        )
+        content = result["summary_path"].read_text()
+        # Exactly one marker — no duplication
+        assert content.count("[t=60s]") == 1
+
+    def test_summary_without_markers_unchanged(self, tmp_path, sample_video, sample_summary):
+        result = generate_summary_files(
+            video=sample_video,
+            summary=sample_summary,
+            output_dir=tmp_path,
+            date_str="2026-02-16",
+        )
+        content = result["summary_path"].read_text()
+        # No spurious timestamp artefacts introduced
+        assert "[t=" not in content
+        assert "[[t=" not in content

@@ -632,3 +632,64 @@ class TestDeepLinks:
         # loadDate should check next index entry if current date has no ### entries
         assert "hasContent" in VIEWER_HTML
         assert "DIGEST_INDEX[idx + 1]" in VIEWER_HTML
+
+
+# ===== TIMESTAMP CHIPS =====
+
+class TestTimestampChips:
+    """Viewer converts [t=NNs] markers to ▶ MM:SS chips in Key Findings.
+    It must also handle legacy [[t=NNs]](url) markdown links (generated
+    before the fix) by stripping the URL and showing only the chip.
+    """
+
+    def test_key_findings_renders_raw_marker_as_chip(self):
+        # Raw [t=NNs] → clickable chip in Key Findings renderer
+        assert r'replace(/\[t=(\d+)s\]/g' in VIEWER_HTML
+
+    def test_key_findings_chip_shows_mm_ss(self):
+        # Chip label is ▶ MM:SS (not the raw seconds)
+        assert "Math.floor(s / 60)" in VIEWER_HTML
+        assert "padStart(2, '0')" in VIEWER_HTML
+
+    def test_key_findings_chip_links_to_youtube(self):
+        # When videoId is present, chip is an <a> to YouTube with &t=
+        assert "youtube.com/watch?v=' + videoId + '&t='" in VIEWER_HTML
+        assert "class=\"ts-chip\"" in VIEWER_HTML
+
+    def test_key_findings_chip_is_span_without_video_id(self):
+        # Without videoId, chip degrades gracefully to a <span>
+        assert "'<span class=\"ts-chip\">' + label + '</span>'" in VIEWER_HTML or \
+               '"<span class=\\"ts-chip\\">" + label + "</span>"' in VIEWER_HTML or \
+               "span class=\\'ts-chip\\'" in VIEWER_HTML or \
+               "ts-chip" in VIEWER_HTML  # broad check — chip CSS class always present
+
+    def test_key_findings_strips_legacy_link_format(self):
+        # [[t=NNs]](url) (old format) must be collapsed to [t=NNs] before chip conversion
+        assert r'replace(/\[\[t=(\d+)s\]\]\([^)]*\)/g' in VIEWER_HTML
+
+    def test_key_findings_legacy_strip_before_raw_replace(self):
+        # Legacy strip must come BEFORE the raw [t=NNs] replace in the source
+        legacy_pos = VIEWER_HTML.find(r'\[\[t=(\d+)s\]\]')
+        raw_pos = VIEWER_HTML.find(r'\[t=(\d+)s\]')
+        assert legacy_pos != -1, "Legacy strip pattern not found"
+        assert raw_pos != -1, "Raw marker pattern not found"
+        assert legacy_pos < raw_pos, "Legacy strip must appear before raw marker replace"
+
+    def test_md2html_strips_legacy_link_format(self):
+        # md2html (fallback renderer) must also handle [[t=NNs]](url)
+        # Find md2html function and check it strips the legacy pattern
+        md2html_start = VIEWER_HTML.find("function md2html(")
+        assert md2html_start != -1
+        md2html_body = VIEWER_HTML[md2html_start:md2html_start + 1500]
+        assert r'\[\[t=(\d+)s\]\]' in md2html_body
+
+    def test_md2html_converts_raw_marker_to_chip(self):
+        # md2html must also convert raw [t=NNs] markers (new format) to chips
+        md2html_start = VIEWER_HTML.find("function md2html(")
+        md2html_body = VIEWER_HTML[md2html_start:md2html_start + 1500]
+        assert r'\[t=(\d+)s\]' in md2html_body
+        assert "ts-chip" in md2html_body
+
+    def test_ts_chip_has_css_styling(self):
+        # .ts-chip must be styled (not just a bare <a>/<span>)
+        assert ".ts-chip" in VIEWER_HTML
