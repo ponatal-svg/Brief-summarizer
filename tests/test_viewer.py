@@ -586,6 +586,14 @@ class TestHubHTML:
         # Each feed item href includes ?date= so it deep-links to the right date
         assert "?date=' + encodeURIComponent(item.date)" in HUB_HTML
 
+    def test_hub_feed_items_link_includes_category(self):
+        # href also appends &category=NAME so detail page filters to the right section
+        assert "&category=' + encodeURIComponent(item.category)" in HUB_HTML
+
+    def test_hub_feed_items_category_guarded(self):
+        # category param only appended when present — no &category=undefined for uncategorised items
+        assert "if (item.category)" in HUB_HTML
+
     def test_hub_feed_label_uses_resolved_date(self):
         # feedLabel uses the date where content was actually found, not just latestYt
         assert "feedDateStr" in HUB_HTML

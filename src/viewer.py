@@ -1259,6 +1259,7 @@ async function renderFeed() {
     var item = items[i];
     var baseHref = item.type === 'youtube' ? 'youtube.html' : 'podcasts.html';
     var href = baseHref + '?date=' + encodeURIComponent(item.date);
+    if (item.category) href += '&category=' + encodeURIComponent(item.category);
     html += '<a class="recent-item" href="' + href + '">' +
       '<div class="dot"></div>' +
       '<div class="recent-body">' +
