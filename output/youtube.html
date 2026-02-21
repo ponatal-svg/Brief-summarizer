@@ -553,7 +553,8 @@ async function init() {
     var parts = d.split('-');
     btn.textContent = parts[1] + '/' + parts[2];
     btn.title = d;  // full date on hover
-    btn.onclick = function() { loadDate(d); };
+    // Pass explicit=true so loadDate never auto-falls-back on user clicks
+    btn.onclick = function() { loadDate(d, false, true); };
     nav.appendChild(btn);
   });
 
@@ -598,7 +599,8 @@ function buildFilters() {
 }
 
 /* ===== DATE LOADING ===== */
-async function loadDate(dateStr, fallback) {
+// explicit=true when triggered by a user button click — skip auto-fallback
+async function loadDate(dateStr, fallback, explicit) {
   currentDate = dateStr;
   allExpanded = false;
   updateExpandBtn();
@@ -615,12 +617,12 @@ async function loadDate(dateStr, fallback) {
     var resp = await fetch('daily/' + dateStr + '.md');
     if (!resp.ok) throw new Error('Not found');
     var md = await resp.text();
-    // If this date has no content and we have a fallback, try the next date
+    // Auto-fallback to next older date only on initial page load (not on explicit user clicks)
     var hasContent = md.includes('### ');
-    if (!hasContent && !fallback) {
+    if (!hasContent && !fallback && !explicit) {
       var idx = DIGEST_INDEX.indexOf(dateStr);
       if (idx !== -1 && idx + 1 < DIGEST_INDEX.length) {
-        loadDate(DIGEST_INDEX[idx + 1], true);
+        loadDate(DIGEST_INDEX[idx + 1], true, false);
         return;
       }
     }
