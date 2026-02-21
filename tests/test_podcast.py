@@ -553,13 +553,14 @@ class TestFetchNewEpisodes:
         assert result[0].episode_id == "ep1id"
 
     def test_guarantees_min_episode_when_none_in_window(self, sample_show):
+        """Fallback includes an episode outside the lookback window but within 30 days."""
         rss_cache = {}
         now = datetime.now(timezone.utc)
         old_ep = EpisodeInfo(
             episode_id="old_id", title="Old Episode", show_name="Hard Fork",
             show_url="https://spotify", episode_url="https://ep",
             audio_url="https://cdn/ep.mp3", category="AI",
-            published_at=now - timedelta(days=30), duration_seconds=3600,
+            published_at=now - timedelta(days=15), duration_seconds=3600,
         )
         with patch("src.fetchers.podcast.resolve_rss_feed", return_value="https://rss.example.com"):
             with patch("src.fetchers.podcast._parse_rss_feed", return_value=[old_ep]):
@@ -574,6 +575,100 @@ class TestFetchNewEpisodes:
 
         assert len(result) == 1
         assert result[0].episode_id == "old_id"
+
+    def test_fallback_does_not_include_archive_episodes(self, sample_show):
+        """Min-episodes fallback must not surface episodes older than 30 days.
+
+        This is the core bug fix: when all recent episodes are already processed,
+        the fallback was iterating through the entire RSS history and picking up
+        archive content (e.g. a 2022 episode from a back-catalogue).
+        """
+        rss_cache = {}
+        now = datetime.now(timezone.utc)
+        archive_ep = EpisodeInfo(
+            episode_id="archive_id", title="Archive Episode", show_name="Hard Fork",
+            show_url="https://spotify", episode_url="https://ep",
+            audio_url="https://cdn/ep.mp3", category="AI",
+            published_at=now - timedelta(days=365),  # 1 year old
+            duration_seconds=3600,
+        )
+        with patch("src.fetchers.podcast.resolve_rss_feed", return_value="https://rss.example.com"):
+            with patch("src.fetchers.podcast._parse_rss_feed", return_value=[archive_ep]):
+                result = fetch_new_episodes(
+                    show=sample_show,
+                    processed_ids=set(),
+                    lookback_hours=26,
+                    max_episodes=3,
+                    min_episodes=1,
+                    rss_cache=rss_cache,
+                )
+
+        assert result == [], "Archive episode (>30 days) must not be included via min_episodes fallback"
+
+    def test_fallback_skips_processed_and_picks_recent_unprocessed(self, sample_show):
+        """When recent episodes are processed, fallback picks the next most recent
+        unprocessed one within the 30-day cap — not an archive episode."""
+        rss_cache = {}
+        now = datetime.now(timezone.utc)
+        recent_processed = EpisodeInfo(
+            episode_id="recent_proc", title="Recent Processed", show_name="Hard Fork",
+            show_url="https://spotify", episode_url="https://ep1",
+            audio_url="https://cdn/ep1.mp3", category="AI",
+            published_at=now - timedelta(days=1), duration_seconds=3600,
+        )
+        recent_unprocessed = EpisodeInfo(
+            episode_id="recent_unproc", title="Recent Unprocessed", show_name="Hard Fork",
+            show_url="https://spotify", episode_url="https://ep2",
+            audio_url="https://cdn/ep2.mp3", category="AI",
+            published_at=now - timedelta(days=10), duration_seconds=3600,
+        )
+        archive_ep = EpisodeInfo(
+            episode_id="archive_id", title="Archive 2022", show_name="Hard Fork",
+            show_url="https://spotify", episode_url="https://ep3",
+            audio_url="https://cdn/ep3.mp3", category="AI",
+            published_at=now - timedelta(days=400),
+            duration_seconds=3600,
+        )
+        # Newest-first order as _parse_rss_feed returns
+        all_eps = [recent_processed, recent_unprocessed, archive_ep]
+        with patch("src.fetchers.podcast.resolve_rss_feed", return_value="https://rss.example.com"):
+            with patch("src.fetchers.podcast._parse_rss_feed", return_value=all_eps):
+                result = fetch_new_episodes(
+                    show=sample_show,
+                    processed_ids={"recent_proc"},
+                    lookback_hours=6,   # short window — only recent_proc would qualify but it's processed
+                    max_episodes=3,
+                    min_episodes=1,
+                    rss_cache=rss_cache,
+                )
+
+        assert len(result) == 1
+        assert result[0].episode_id == "recent_unproc", \
+            "Should pick the 10-day-old unprocessed episode, not the 400-day archive"
+
+    def test_fallback_boundary_exactly_30_days_excluded(self, sample_show):
+        """Episode published exactly 30 days ago is on the wrong side of the cap."""
+        rss_cache = {}
+        now = datetime.now(timezone.utc)
+        boundary_ep = EpisodeInfo(
+            episode_id="boundary_id", title="Boundary Episode", show_name="Hard Fork",
+            show_url="https://spotify", episode_url="https://ep",
+            audio_url="https://cdn/ep.mp3", category="AI",
+            published_at=now - timedelta(days=30, seconds=1),  # just over 30 days
+            duration_seconds=3600,
+        )
+        with patch("src.fetchers.podcast.resolve_rss_feed", return_value="https://rss.example.com"):
+            with patch("src.fetchers.podcast._parse_rss_feed", return_value=[boundary_ep]):
+                result = fetch_new_episodes(
+                    show=sample_show,
+                    processed_ids=set(),
+                    lookback_hours=26,
+                    max_episodes=3,
+                    min_episodes=1,
+                    rss_cache=rss_cache,
+                )
+
+        assert result == [], "Episode just over 30 days old must not be included"
 
     def test_skips_already_processed(self, sample_show):
         rss_cache = {}

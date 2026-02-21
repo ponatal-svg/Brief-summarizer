@@ -131,8 +131,13 @@ def fetch_new_episodes(
     within_window = within_window[:max_episodes]
 
     # Step 4: Guarantee minimum — if window returned nothing, use the latest unprocessed
+    # episode, but only within a 30-day hard cap to avoid surfacing archive content
+    # (e.g. a 2022 episode when all recent ones are already processed).
+    fallback_cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     if len(within_window) < min_episodes:
         for ep in all_episodes:
+            if ep.published_at < fallback_cutoff:
+                break  # all_episodes is newest-first; nothing older is worth including
             if ep.episode_id not in processed_ids and ep not in within_window:
                 within_window.append(ep)
                 logger.info(
