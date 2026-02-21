@@ -48,14 +48,15 @@ sources:
       language: "es"
     # News podcasts
     - podcast_url: "https://open.spotify.com/show/02HrvZIs1Az8vwVu6VMbXE"
-      name: "The Daily"
+      name: "Shulhan 4"
       category: "News"
+      language: "he"
     - podcast_url: "https://open.spotify.com/show/0GRPAKeSMASfbQ7VgNwYCR"
-      name: "Global News Podcast"
+      name: "Honestly with Bari Weiss"
       category: "News"
     # Humanities podcast
     - podcast_url: "https://open.spotify.com/show/11VjrLJfoiNvgjjqov4RWh"
-      name: "Philosophize This!"
+      name: "SOLVED with Mark Manson"
       category: "Humanities"
 
 settings:
