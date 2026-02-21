@@ -557,7 +557,22 @@ async function init() {
   });
 
   buildFilters();
-  loadDate(DIGEST_INDEX[0]);
+
+  // Honour ?date=YYYY-MM-DD and ?category=Name in URL for deep linking
+  var urlParams = new URLSearchParams(window.location.search);
+  var reqDate = urlParams.get('date');
+  var reqCat = urlParams.get('category');
+  var startDate = (reqDate && DIGEST_INDEX.indexOf(reqDate) !== -1) ? reqDate : DIGEST_INDEX[0];
+
+  // Pre-apply category filter if specified (applyFilter is called again after renderDigest)
+  if (reqCat) {
+    var matchedCat = Object.keys(CATEGORIES).find(function(c) {
+      return c.toLowerCase() === reqCat.toLowerCase();
+    });
+    if (matchedCat) currentFilter = matchedCat;
+  }
+
+  loadDate(startDate);
 }
 
 function buildFilters() {
@@ -582,7 +597,7 @@ function buildFilters() {
 }
 
 /* ===== DATE LOADING ===== */
-async function loadDate(dateStr) {
+async function loadDate(dateStr, fallback) {
   currentDate = dateStr;
   allExpanded = false;
   updateExpandBtn();
@@ -599,6 +614,15 @@ async function loadDate(dateStr) {
     var resp = await fetch('daily/' + dateStr + '.md');
     if (!resp.ok) throw new Error('Not found');
     var md = await resp.text();
+    // If this date has no content and we have a fallback, try the next date
+    var hasContent = md.includes('### ');
+    if (!hasContent && !fallback) {
+      var idx = DIGEST_INDEX.indexOf(dateStr);
+      if (idx !== -1 && idx + 1 < DIGEST_INDEX.length) {
+        loadDate(DIGEST_INDEX[idx + 1], true);
+        return;
+      }
+    }
     renderDigest(md, dateStr);
   } catch(e) {
     content.innerHTML = '<div class="empty">No digest for ' + dateStr + '</div>';
@@ -1097,6 +1121,7 @@ function renderTiles() {
     ? '<span class="stile-status live" id="podCount">...</span>'
     : '<span class="stile-status empty">no data</span>';
 
+  // Placeholders — renderFeed will update href, count and preview once it resolves the real date
   var ytPreview = latestYt ? '<div class="stile-preview" id="ytPreview">loading...</div>' : '<div class="stile-preview italic">No YouTube digests yet</div>';
   var podPreview = latestPod ? '<div class="stile-preview" id="podPreview">loading...</div>' : '<div class="stile-preview italic">No podcast digests yet</div>';
 
@@ -1106,25 +1131,20 @@ function renderTiles() {
   var ytClass = latestYt ? 'stile yt' : 'stile yt muted';
   var podClass = latestPod ? 'stile pod' : 'stile pod muted';
 
+  // Tiles start with placeholder hrefs; renderFeed() will update them once dates are resolved
   document.getElementById('tiles').innerHTML =
-    '<a class="' + ytClass + '" href="youtube.html">' +
+    '<a class="' + ytClass + '" href="youtube.html" id="ytTile">' +
       '<div class="stile-row1"><span class="stile-icon">&#9654;</span>' + ytStatus + '</div>' +
       '<div class="stile-name">YouTube</div>' +
       '<div class="stile-sub">' + (catNames || 'No categories') + '</div>' +
       ytPreview + ytCta +
     '</a>' +
-    '<a class="' + podClass + '" href="podcasts.html">' +
+    '<a class="' + podClass + '" href="podcasts.html" id="podTile">' +
       '<div class="stile-row1"><span class="stile-icon">&#127897;</span>' + podStatus + '</div>' +
       '<div class="stile-name">Podcasts</div>' +
       '<div class="stile-sub">' + (catNames || 'No categories') + '</div>' +
       podPreview + podCta +
-    '</a>' +
-    '<div class="stile muted">' +
-      '<div class="stile-row1"><span class="stile-icon">&#127758;</span><span class="stile-status soon">Phase 3</span></div>' +
-      '<div class="stile-name">Web &amp; News</div>' +
-      '<div class="stile-sub">Tracked pages &amp; articles</div>' +
-      '<div class="stile-preview italic">Not yet configured</div>' +
-    '</div>';
+    '</a>';
 }
 
 async function renderFeed() {
@@ -1138,62 +1158,69 @@ async function renderFeed() {
   }
 
   var items = [];
+  var ytDateUsed = null;
+  var podDateUsed = null;
 
   if (latestYt) {
     try {
-      var resp = await fetch('daily/' + latestYt + '.md');
-      if (resp.ok) {
-        var md = await resp.text();
-        var parsed = parseDigest(md, 'youtube', latestYt);
-        items = items.concat(parsed);
-        var el = document.getElementById('ytCount');
-        if (el) el.textContent = parsed.length + ' new';
-        var el2 = document.getElementById('ytPreview');
-        if (parsed.length > 0) {
-          if (el2) el2.textContent = parsed[0].title;
-        } else {
-          // Latest date has no content — look back one date for preview
-          if (el2) el2.textContent = 'Nothing new today';
-          var prevYt = ytIndex[1] || null;
-          if (prevYt) {
-            try {
-              var r2 = await fetch('daily/' + prevYt + '.md');
-              if (r2.ok) {
-                var parsed2 = parseDigest(await r2.text(), 'youtube', prevYt);
-                items = items.concat(parsed2);
-              }
-            } catch(e2) {}
+      // Walk dates newest-first until we find one with actual content
+      var ytDates = ytIndex.slice(0, 3).filter(Boolean);
+      for (var yi = 0; yi < ytDates.length; yi++) {
+        var resp = await fetch('daily/' + ytDates[yi] + '.md');
+        if (resp.ok) {
+          var md = await resp.text();
+          var parsed = parseDigest(md, 'youtube', ytDates[yi]);
+          if (parsed.length > 0) {
+            items = items.concat(parsed);
+            ytDateUsed = ytDates[yi];
+            var el = document.getElementById('ytCount');
+            var el2 = document.getElementById('ytPreview');
+            var tile = document.getElementById('ytTile');
+            if (el) el.textContent = parsed.length + ' new';
+            if (el2) el2.textContent = parsed[0].title;
+            if (tile) tile.href = 'youtube.html?date=' + encodeURIComponent(ytDateUsed);
+            break;
           }
         }
+      }
+      // Only show "Nothing new" if truly no date had content
+      if (!ytDateUsed) {
+        var el = document.getElementById('ytCount');
+        var el2 = document.getElementById('ytPreview');
+        if (el) el.textContent = '0 new';
+        if (el2) el2.textContent = 'Nothing new today';
       }
     } catch(e) {}
   }
 
   if (latestPod) {
     try {
-      var resp = await fetch('podcast-daily/' + latestPod + '.md');
-      if (resp.ok) {
-        var md = await resp.text();
-        var parsed = parseDigest(md, 'podcast', latestPod);
-        items = items.concat(parsed);
-        var el = document.getElementById('podCount');
-        if (el) el.textContent = parsed.length + ' new';
-        var el2 = document.getElementById('podPreview');
-        if (parsed.length > 0) {
-          if (el2) el2.textContent = parsed[0].title;
-        } else {
-          if (el2) el2.textContent = 'Nothing new today';
-          var prevPod = podIndex[1] || null;
-          if (prevPod) {
-            try {
-              var r2 = await fetch('podcast-daily/' + prevPod + '.md');
-              if (r2.ok) {
-                var parsed2 = parseDigest(await r2.text(), 'podcast', prevPod);
-                items = items.concat(parsed2);
-              }
-            } catch(e2) {}
+      // Walk dates newest-first until we find one with actual content
+      var podDates = podIndex.slice(0, 3).filter(Boolean);
+      for (var pi = 0; pi < podDates.length; pi++) {
+        var resp = await fetch('podcast-daily/' + podDates[pi] + '.md');
+        if (resp.ok) {
+          var md = await resp.text();
+          var parsed = parseDigest(md, 'podcast', podDates[pi]);
+          if (parsed.length > 0) {
+            items = items.concat(parsed);
+            podDateUsed = podDates[pi];
+            var el = document.getElementById('podCount');
+            var el2 = document.getElementById('podPreview');
+            var tile = document.getElementById('podTile');
+            if (el) el.textContent = parsed.length + ' new';
+            if (el2) el2.textContent = parsed[0].title;
+            if (tile) tile.href = 'podcasts.html?date=' + encodeURIComponent(podDateUsed);
+            break;
           }
         }
+      }
+      // Only show "Nothing new" if truly no date had content
+      if (!podDateUsed) {
+        var el = document.getElementById('podCount');
+        var el2 = document.getElementById('podPreview');
+        if (el) el.textContent = '0 new';
+        if (el2) el2.textContent = 'Nothing new today';
       }
     } catch(e) {}
   }
@@ -1204,16 +1231,17 @@ async function renderFeed() {
     return;
   }
 
-  var dateStr = latestYt || latestPod;
-  var d = new Date(dateStr + 'T00:00:00');
+  var feedDateStr = ytDateUsed || podDateUsed || latestYt || latestPod;
+  var fd = new Date(feedDateStr + 'T00:00:00');
   var months2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   document.getElementById('feedLabel').textContent =
-    'All sources \\u00b7 ' + months2[d.getMonth()] + ' ' + d.getDate();
+    'All sources \\u00b7 ' + months2[fd.getMonth()] + ' ' + fd.getDate();
 
   var html = '';
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
-    var href = item.type === 'youtube' ? 'youtube.html' : 'podcasts.html';
+    var baseHref = item.type === 'youtube' ? 'youtube.html' : 'podcasts.html';
+    var href = baseHref + '?date=' + encodeURIComponent(item.date);
     html += '<a class="recent-item" href="' + href + '">' +
       '<div class="dot"></div>' +
       '<div class="recent-body">' +
@@ -1245,7 +1273,7 @@ function parseDigest(md, type, dateStr) {
       }
     }
     if (title && title !== 'No new content found today.' && !title.startsWith('No new')) {
-      items.push({ title: title, meta: meta, type: type, category: currentCat });
+      items.push({ title: title, meta: meta, type: type, category: currentCat, date: dateStr });
     }
   }
   return items;

@@ -544,7 +544,22 @@ async function init() {
   });
 
   buildFilters();
-  loadDate(DIGEST_INDEX[0]);
+
+  // Honour ?date=YYYY-MM-DD and ?category=Name in URL for deep linking
+  var urlParams = new URLSearchParams(window.location.search);
+  var reqDate = urlParams.get('date');
+  var reqCat = urlParams.get('category');
+  var startDate = (reqDate && DIGEST_INDEX.indexOf(reqDate) !== -1) ? reqDate : DIGEST_INDEX[0];
+
+  // Pre-apply category filter if specified (applyFilter is called again after renderDigest)
+  if (reqCat) {
+    var matchedCat = Object.keys(CATEGORIES).find(function(c) {
+      return c.toLowerCase() === reqCat.toLowerCase();
+    });
+    if (matchedCat) currentFilter = matchedCat;
+  }
+
+  loadDate(startDate);
 }
 
 function buildFilters() {
@@ -569,7 +584,7 @@ function buildFilters() {
 }
 
 /* ===== DATE LOADING ===== */
-async function loadDate(dateStr) {
+async function loadDate(dateStr, fallback) {
   currentDate = dateStr;
   allExpanded = false;
   updateExpandBtn();
@@ -586,6 +601,15 @@ async function loadDate(dateStr) {
     var resp = await fetch('podcast-daily/' + dateStr + '.md');
     if (!resp.ok) throw new Error('Not found');
     var md = await resp.text();
+    // If this date has no content and we have a fallback, try the next date
+    var hasContent = md.includes('### ');
+    if (!hasContent && !fallback) {
+      var idx = DIGEST_INDEX.indexOf(dateStr);
+      if (idx !== -1 && idx + 1 < DIGEST_INDEX.length) {
+        loadDate(DIGEST_INDEX[idx + 1], true);
+        return;
+      }
+    }
     renderDigest(md, dateStr);
   } catch(e) {
     content.innerHTML = '<div class="empty">No digest for ' + dateStr + '</div>';

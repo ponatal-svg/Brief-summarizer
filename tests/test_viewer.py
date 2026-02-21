@@ -532,8 +532,12 @@ class TestHubHTML:
         assert "fetch('daily/'" in HUB_HTML
         assert "fetch('podcast-daily/'" in HUB_HTML
 
-    def test_has_three_tiles(self):
-        assert "Phase 3" in HUB_HTML  # web/news tile placeholder
+    def test_has_two_tiles_no_web_news(self):
+        # Web & News placeholder tile was removed; only YouTube + Podcasts
+        assert "Phase 3" not in HUB_HTML
+        assert "Web &amp; News" not in HUB_HTML
+        assert "youtube.html" in HUB_HTML
+        assert "podcasts.html" in HUB_HTML
 
     def test_parse_digest_function(self):
         assert "function parseDigest(" in HUB_HTML
@@ -552,20 +556,79 @@ class TestHubHTML:
         assert "width=device-width" in HUB_HTML
 
     def test_hub_shows_nothing_new_today_when_empty(self):
-        # When the latest digest has 0 items, the preview should read
-        # "Nothing new today" rather than staying stuck on "loading..."
+        # Only shown after exhausting all fallback dates, not immediately
         assert "Nothing new today" in HUB_HTML
 
-    def test_hub_falls_back_to_previous_date_for_feed(self):
-        # When the latest digest is empty, hub fetches the previous date
-        # (ytIndex[1] / podIndex[1]) so the feed is never blank.
-        assert "ytIndex[1]" in HUB_HTML
-        assert "podIndex[1]" in HUB_HTML
+    def test_hub_falls_back_through_multiple_dates(self):
+        # Hub walks up to 3 dates to find one with actual content
+        assert "ytIndex.slice(0, 3)" in HUB_HTML
+        assert "podIndex.slice(0, 3)" in HUB_HTML
 
-    def test_hub_podcasts_fallback_uses_podcast_daily(self):
-        # The podcast fallback must fetch from podcast-daily/, not daily/
-        assert "podcast-daily/' + prevPod" in HUB_HTML
+    def test_hub_nothing_new_only_after_all_fallbacks_exhausted(self):
+        # "Nothing new today" must appear AFTER the loop, not inside it
+        # i.e. it's in a separate block guarded by !ytDateUsed / !podDateUsed
+        assert "!ytDateUsed" in HUB_HTML
+        assert "!podDateUsed" in HUB_HTML
 
-    def test_hub_youtube_fallback_uses_daily(self):
-        # The YouTube fallback must fetch from daily/, not podcast-daily/
-        assert "daily/' + prevYt" in HUB_HTML
+    def test_hub_tile_href_updated_after_date_resolution(self):
+        # After finding a date with content, the tile anchor href is patched
+        assert 'getElementById(\'ytTile\')' in HUB_HTML
+        assert 'getElementById(\'podTile\')' in HUB_HTML
+        assert "tile.href = 'youtube.html?date='" in HUB_HTML
+        assert "tile.href = 'podcasts.html?date='" in HUB_HTML
+
+    def test_hub_tile_ids_present_in_rendered_html(self):
+        # Tile anchor elements must have id="ytTile" and id="podTile"
+        assert 'id="ytTile"' in HUB_HTML
+        assert 'id="podTile"' in HUB_HTML
+
+    def test_hub_feed_items_link_to_date(self):
+        # Each feed item href includes ?date= so it deep-links to the right date
+        assert "?date=' + encodeURIComponent(item.date)" in HUB_HTML
+
+    def test_hub_feed_label_uses_resolved_date(self):
+        # feedLabel uses the date where content was actually found, not just latestYt
+        assert "feedDateStr" in HUB_HTML
+        assert "ytDateUsed || podDateUsed" in HUB_HTML
+
+    def test_hub_parse_digest_stores_date_on_items(self):
+        # parseDigest attaches dateStr to each item so feed links can use it
+        assert "date: dateStr" in HUB_HTML
+
+
+# ===== DEEP LINKS =====
+
+class TestDeepLinks:
+    def test_youtube_honours_date_url_param(self):
+        # Init reads ?date= from URL and selects that date
+        assert "URLSearchParams(window.location.search)" in VIEWER_HTML
+        assert "urlParams.get('date')" in VIEWER_HTML
+
+    def test_youtube_validates_date_against_index(self):
+        # Should only use the requested date if it exists in DIGEST_INDEX
+        assert "DIGEST_INDEX.indexOf(reqDate)" in VIEWER_HTML
+
+    def test_youtube_falls_back_to_latest_for_unknown_date(self):
+        # If ?date= is not in the index, default to DIGEST_INDEX[0]
+        assert "DIGEST_INDEX[0]" in VIEWER_HTML
+
+    def test_youtube_honours_category_url_param(self):
+        # Init reads ?category= from URL and pre-applies the filter
+        assert "urlParams.get('category')" in VIEWER_HTML
+        assert "currentFilter = matchedCat" in VIEWER_HTML
+
+    def test_youtube_category_matching_is_case_insensitive(self):
+        # Category match should be lowercase-compared
+        assert "c.toLowerCase() === reqCat.toLowerCase()" in VIEWER_HTML
+
+    def test_podcasts_honours_date_url_param(self):
+        assert "URLSearchParams(window.location.search)" in PODCASTS_HTML
+        assert "urlParams.get('date')" in PODCASTS_HTML
+
+    def test_podcasts_honours_category_url_param(self):
+        assert "urlParams.get('category')" in PODCASTS_HTML
+
+    def test_youtube_load_date_falls_back_when_empty(self):
+        # loadDate should check next index entry if current date has no ### entries
+        assert "hasContent" in VIEWER_HTML
+        assert "DIGEST_INDEX[idx + 1]" in VIEWER_HTML
