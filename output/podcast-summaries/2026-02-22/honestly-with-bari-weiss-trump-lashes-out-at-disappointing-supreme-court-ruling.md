@@ -1,0 +1,20 @@
+# Trump lashes out at 'disappointing' Supreme Court ruling
+
+**Show:** Honestly with Bari Weiss | **Category:** News | **Duration:** 30m 26s | **Published:** 2026-02-21 | **Language:** en
+
+**Source:** [http://www.bbc.co.uk/programmes/p0n2f4d1](http://www.bbc.co.uk/programmes/p0n2f4d1)
+
+---
+
+## The Hook
+This episode of the Global News Podcast, dated Saturday, February 21st, highlights how former President Donald Trump's challenges with tariffs and the Supreme Court reflect broader struggles over executive power, while escalating conflicts in the Israeli-Palestinian territories, debates around the British Monarchy's future, and new ventures in space exploration and UFO disclosure signal a period of intense global re-evaluation and change.
+
+## Key Findings
+*   **Trump's Tariff Policy Overruled:** Former President Donald Trump expressed "deeply disappointing" and "absolutely ashamed" sentiments after the US Supreme Court struck down his "sweeping trade tariffs policy" by a 6-3 vote, deeming it "unlawful." Despite appointing two of the judges who ruled against him, Trump quickly announced a new 10% global tariff using a different legal authority. However, Democratic Senator Chuck Schumer criticized the tariffs for "dramatically increased costs on American families."
+*   **Prince Andrew's Succession Challenge:** The UK government is considering legislation to remove Prince Andrew Mountbatten-Windsor from the royal line of succession, following his arrest on suspicion of misconduct in public office. The Metropolitan Police are expanding their investigation into his links with convicted sex offender Jeffrey Epstein, reviewing flight records and contacting former protection officers. This move requires support from 14 Commonwealth countries, prompting renewed discussions in nations like Australia and Canada about becoming republics.
+*   **Escalation in the West Bank:** The family of Nazreela Abu Saiam, a 19-year-old Palestinian-American shot dead by an Israeli settler, is demanding accountability for his killing, which marks at least the sixth American citizen killed in the territory in the last two years. A far-right Israeli finance minister has proposed dismantling the Palestinian Authority (PA) and implementing new steps that critics say amount to a "de facto annexation" of the West Bank, where Israeli settlement growth is reportedly at a record high.
+*   **NASA's Lunar Return Scheduled:** More than 50 years after humans last traveled to the moon, NASA has scheduled the Artemis 2 mission for launch on March 6th. This mission aims to send astronauts around the moon for the first time in half a century, on a 10-day voyage that will travel "the furthest into space humans have ever been." According to science correspondent Georgina Rennard, this launch is a "major test of America's burning ambition to beat China in the race to build human settlements on the moon."
+*   **Government Disclosure on Extraterrestrial Life:** Former President Donald Trump has stated he will direct the Department of Defense to begin releasing government files related to extraterrestrial life, describing the matters as "extremely interesting and important." This announcement followed comments from former President Barack Obama, who said he believed aliens existed but had seen no evidence during his presidency. Dr. Becky Smethurst, an astrophysicist, noted that many of these documents likely pertain to "unexplained things in the sky" or UFOs, rather than definitive evidence of alien contact.
+
+## The So What?
+The diverse topics covered in this episode reflect a global landscape where established norms are being challenged, from the constitutional limits of presidential power to long-standing monarchical traditions and the diplomatic complexities of international conflicts. The discussions on economic leverage, royal scandals, and space exploration, alongside the potential for unprecedented government disclosures, suggest a future where political and social structures may undergo significant transformations, demanding constant attention to evolving dynamics.
