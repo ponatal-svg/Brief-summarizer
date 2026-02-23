@@ -12,7 +12,8 @@
   "rss_cache": {
     "https://open.spotify.com/show/0sGGLIDnnijRPLef7InllD": "https://feeds.acast.com/public/shows/69779e4cf4b515342e3b249c",
     "https://open.spotify.com/show/11VjrLJfoiNvgjjqov4RWh": "https://feeds.megaphone.fm/ISML9402684841",
-    "https://open.spotify.com/show/44fllCS2FTFr2x2kjP9xeT": "https://feeds.simplecast.com/6HKOhNgS"
+    "https://open.spotify.com/show/44fllCS2FTFr2x2kjP9xeT": "https://feeds.simplecast.com/6HKOhNgS",
+    "https://rss.libsyn.com/shows/136379/destinations/844493.xml": "https://rss.libsyn.com/shows/136379/destinations/844493.xml"
   },
   "youtube": {
     "-q2n5DkDoMQ": "2026-02-23",

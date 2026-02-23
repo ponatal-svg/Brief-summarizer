@@ -46,10 +46,14 @@ sources:
       name: "Entiende Tu Mente"
       category: "Wellbeing"
       language: "es"
-    # Humanities podcast
+    # Humanities podcasts
     - podcast_url: "https://open.spotify.com/show/11VjrLJfoiNvgjjqov4RWh"
       name: "SOLVED with Mark Manson"
       category: "Humanities"
+    - podcast_url: "https://rss.libsyn.com/shows/136379/destinations/844493.xml"
+      name: "DianaUribe.fm"
+      category: "Humanities"
+      language: "es"
 
 settings:
   max_age_days: 7
