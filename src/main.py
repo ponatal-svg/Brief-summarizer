@@ -42,6 +42,7 @@ from src.state import (
     update_rss_cache,
 )
 from src.summarizer import create_client, summarize, QuotaExhaustedError
+from src.notifier import send_run_notification
 from src.viewer import generate_viewer
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,10 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
     digest_entries = []
     podcast_entries = []
     errors = []
+    # Items detected (fetched) but not successfully processed — for reporting
+    # Each entry: {"type": "youtube"|"podcast", "source": str, "title": str,
+    #              "url": str, "reason": str, "action": str}
+    skipped_items = []
 
     # -----------------------------------------------------------------------
     # YouTube pipeline
@@ -97,6 +102,14 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
             msg = f"Failed to fetch {source.name}: {e}"
             logger.error(msg)
             errors.append({"source": f"YouTube/{source.name}", "message": str(e)})
+            skipped_items.append({
+                "type": "youtube",
+                "source": source.name,
+                "title": "(channel fetch failed)",
+                "url": source.channel_url,
+                "reason": str(e),
+                "action": "Transient network error — will retry on next run automatically.",
+            })
             continue
 
         for video in videos:
@@ -110,6 +123,14 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 errors.append({
                     "source": f"Transcript/{video.channel_name}",
                     "message": msg,
+                })
+                skipped_items.append({
+                    "type": "youtube",
+                    "source": video.channel_name,
+                    "title": video.title,
+                    "url": video.url,
+                    "reason": "YouTube IP block — transcript unavailable",
+                    "action": "Refresh cookies.txt from a logged-in browser session, then re-run.",
                 })
                 continue
 
@@ -127,9 +148,17 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
             except QuotaExhaustedError as e:
                 logger.error("Daily Gemini quota exhausted — saving progress and stopping early")
                 errors.append({"source": "Gemini/QuotaExhausted", "message": str(e)})
+                skipped_items.append({
+                    "type": "youtube",
+                    "source": video.channel_name,
+                    "title": video.title,
+                    "url": video.url,
+                    "reason": "Gemini daily quota exhausted",
+                    "action": "Quota resets at midnight Pacific. Re-run tomorrow or upgrade Gemini plan.",
+                })
                 _save_and_generate(
                     state, state_path, rss_cache, digest_entries, podcast_entries,
-                    errors, output_dir, date_str, config,
+                    errors, skipped_items, output_dir, date_str, config,
                 )
                 return
             except Exception as e:
@@ -137,12 +166,19 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 if "401" in str(e) or "403" in str(e) or "api_key_invalid" in error_str or "permission_denied" in error_str:
                     logger.error(f"UNRECOVERABLE: Gemini auth failed — check GEMINI_API_KEY: {e}")
                     errors.append({"source": "Gemini/AuthError", "message": str(e)})
-                    generate_error_report(errors, output_dir, date_str)
+                    generate_error_report(errors, skipped_items, output_dir, date_str)
                     sys.exit(1)
                 msg = f"Summarization failed for '{video.title}': {e}"
                 logger.error(msg)
                 errors.append({"source": f"Gemini/{video.channel_name}", "message": msg})
-                # Do not add to digest_entries — errors stay in logs, not on the UI
+                skipped_items.append({
+                    "type": "youtube",
+                    "source": video.channel_name,
+                    "title": video.title,
+                    "url": video.url,
+                    "reason": f"Gemini summarization error: {e}",
+                    "action": "Transient API error — will retry on next run.",
+                })
                 continue
 
             try:
@@ -178,11 +214,31 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
             )
         except RSSLookupError as e:
             errors.append({"source": f"Podcast/RSS/{show.name}", "message": str(e)})
+            skipped_items.append({
+                "type": "podcast",
+                "source": show.name,
+                "title": "(RSS lookup failed)",
+                "url": show.podcast_url,
+                "reason": str(e),
+                "action": (
+                    f"RSS feed not found for '{show.name}'. "
+                    "Find the correct RSS URL at podcastindex.org and set it directly "
+                    "as podcast_url in config.yaml."
+                ),
+            })
             continue
         except Exception as e:
             msg = f"Failed to fetch episodes for '{show.name}': {e}"
             logger.error(msg)
             errors.append({"source": f"Podcast/{show.name}", "message": msg})
+            skipped_items.append({
+                "type": "podcast",
+                "source": show.name,
+                "title": "(episode fetch failed)",
+                "url": show.podcast_url,
+                "reason": str(e),
+                "action": "Transient network error — will retry on next run automatically.",
+            })
             continue
 
         for episode in episodes:
@@ -200,28 +256,53 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
             except QuotaExhaustedError as e:
                 logger.error("Daily Gemini quota exhausted — saving progress and stopping early")
                 errors.append({"source": "Gemini/QuotaExhausted", "message": str(e)})
+                skipped_items.append({
+                    "type": "podcast",
+                    "source": show.name,
+                    "title": episode.title,
+                    "url": episode.episode_url,
+                    "reason": "Gemini daily quota exhausted",
+                    "action": "Quota resets at midnight Pacific. Re-run tomorrow or upgrade Gemini plan.",
+                })
                 _save_and_generate(
                     state, state_path, rss_cache, digest_entries, podcast_entries,
-                    errors, output_dir, date_str, config,
+                    errors, skipped_items, output_dir, date_str, config,
                 )
                 return
             except TranscriptionError as e:
                 msg = str(e)
                 logger.error(f"  Transcription failed for '{episode.title}': {msg}")
                 errors.append({"source": f"Podcast/Transcription/{show.name}", "message": msg})
-                # Do not add to podcast_entries — errors stay in logs, not on the UI
+                skipped_items.append({
+                    "type": "podcast",
+                    "source": show.name,
+                    "title": episode.title,
+                    "url": episode.episode_url,
+                    "reason": f"Transcription failed: {msg}",
+                    "action": (
+                        "Audio download or Gemini transcription failed. "
+                        "Check if the episode audio URL is accessible and re-run."
+                    ),
+                })
                 continue
             except Exception as e:
                 error_str = str(e).lower()
                 if "401" in str(e) or "403" in str(e) or "api_key_invalid" in error_str:
                     logger.error(f"UNRECOVERABLE: Gemini auth failed — check GEMINI_API_KEY: {e}")
                     errors.append({"source": "Gemini/AuthError", "message": str(e)})
-                    generate_error_report(errors, output_dir, date_str)
+                    generate_error_report(errors, skipped_items, output_dir, date_str)
                     sys.exit(1)
                 msg = f"Processing failed for '{episode.title}': {e}"
                 logger.error(msg)
                 errors.append({"source": f"Podcast/{show.name}", "message": msg})
-                # Do not add to podcast_entries — errors stay in logs, not on the UI
+                skipped_items.append({
+                    "type": "podcast",
+                    "source": show.name,
+                    "title": episode.title,
+                    "url": episode.episode_url,
+                    "reason": str(e),
+                    "action": "Transient error — will retry on next run.",
+                })
                 continue
 
             try:
@@ -248,13 +329,12 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
 
     _save_and_generate(
         state, state_path, rss_cache, digest_entries, podcast_entries,
-        errors, output_dir, date_str, config,
+        errors, skipped_items, output_dir, date_str, config,
     )
 
-    total_items = len(digest_entries) + len(podcast_entries)
     logger.info(
         f"Run complete: {len(digest_entries)} YouTube + {len(podcast_entries)} podcast items, "
-        f"{len(errors)} errors"
+        f"{len(errors)} errors, {len(skipped_items)} skipped"
     )
 
 
@@ -265,6 +345,7 @@ def _save_and_generate(
     digest_entries: list,
     podcast_entries: list,
     errors: list,
+    skipped_items: list,
     output_dir: Path,
     date_str: str,
     config,
@@ -275,13 +356,27 @@ def _save_and_generate(
 
     generate_daily_digest(digest_entries, output_dir, date_str, config.categories)
     generate_podcast_daily_digest(podcast_entries, output_dir, date_str, config.categories)
-    generate_error_report(errors, output_dir, date_str)
+    generate_error_report(errors, skipped_items, output_dir, date_str)
     generate_viewer(config, output_dir)
 
     removed = cleanup_old_content(output_dir, config.settings.max_age_days)
     cleanup_state(state_path, config.settings.max_age_days)
     if removed:
         logger.info(f"Cleaned up {len(removed)} expired files")
+
+    # Send email notification if configured
+    if config.settings.notify_email:
+        try:
+            send_run_notification(
+                to_addr=config.settings.notify_email,
+                date_str=date_str,
+                digest_entries=digest_entries,
+                podcast_entries=podcast_entries,
+                skipped_items=skipped_items,
+                errors=errors,
+            )
+        except Exception as e:
+            logger.warning(f"Email notification failed (non-fatal): {e}")
 
 
 def main():

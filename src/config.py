@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
@@ -39,6 +40,7 @@ class Settings:
     max_episodes_per_show: int = 3
     min_episodes_per_show: int = 1
     max_audio_minutes: int = 60
+    notify_email: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -208,5 +210,12 @@ def _parse_settings(raw: dict) -> Settings:
             if expected_type is int and val <= 0:
                 raise ConfigError(f"Setting '{key}' must be positive, got: {val}")
             kwargs[key] = val
+
+    # notify_email is optional string
+    if "notify_email" in raw:
+        val = raw["notify_email"]
+        if val is not None and not isinstance(val, str):
+            raise ConfigError(f"Setting 'notify_email' must be a string, got: {type(val).__name__}")
+        kwargs["notify_email"] = val or None
 
     return Settings(**kwargs)

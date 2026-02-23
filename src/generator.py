@@ -482,33 +482,65 @@ def _stub_entry(existing: dict) -> dict:
     return {"video": video, "paths": paths, "error": None, "_existing": True}
 
 
-def generate_error_report(errors: list, output_dir: Path, date_str: str) -> Optional[Path]:
-    """Generate an error report if there were any failures.
+def generate_error_report(
+    errors: list,
+    skipped_items: list,
+    output_dir: Path,
+    date_str: str,
+) -> Optional[Path]:
+    """Generate an error report if there were any failures or skipped items.
 
     Args:
         errors: List of dicts with keys: source (str), message (str).
+        skipped_items: List of dicts with keys: type, source, title, url, reason, action.
         output_dir: Base output directory.
         date_str: Date string.
 
     Returns:
-        Path to error report, or None if no errors.
+        Path to error report, or None if no errors and no skipped items.
     """
-    if not errors:
+    if not errors and not skipped_items:
         return None
 
     errors_dir = output_dir / "errors"
     errors_dir.mkdir(parents=True, exist_ok=True)
     error_path = errors_dir / f"{date_str}-errors.md"
 
-    lines = [
-        f"# Errors - {date_str}",
-        "",
-    ]
+    lines = [f"# Run Report - {date_str}", ""]
 
-    for err in errors:
-        lines.append(f"- **{err['source']}**: {err['message']}")
+    # --- Skipped items section (detected but not processed) ---
+    if skipped_items:
+        youtube_skipped = [s for s in skipped_items if s["type"] == "youtube"]
+        podcast_skipped = [s for s in skipped_items if s["type"] == "podcast"]
 
-    lines.append("")
+        lines.append(f"## Detected but Not Processed ({len(skipped_items)} item(s))")
+        lines.append("")
+
+        if youtube_skipped:
+            lines.append("### YouTube")
+            lines.append("")
+            for item in youtube_skipped:
+                lines.append(f"- **{item['source']}**: [{item['title']}]({item['url']})")
+                lines.append(f"  - Reason: {item['reason']}")
+                lines.append(f"  - **Action: {item['action']}**")
+                lines.append("")
+
+        if podcast_skipped:
+            lines.append("### Podcasts")
+            lines.append("")
+            for item in podcast_skipped:
+                lines.append(f"- **{item['source']}**: [{item['title']}]({item['url']})")
+                lines.append(f"  - Reason: {item['reason']}")
+                lines.append(f"  - **Action: {item['action']}**")
+                lines.append("")
+
+    # --- Raw errors section ---
+    if errors:
+        lines.append(f"## Raw Errors ({len(errors)})")
+        lines.append("")
+        for err in errors:
+            lines.append(f"- **{err['source']}**: {err['message']}")
+        lines.append("")
 
     error_path.write_text("\n".join(lines), encoding="utf-8")
     logger.info(f"Generated error report: {error_path}")

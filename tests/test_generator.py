@@ -290,7 +290,7 @@ class TestGenerateDailyDigestMerge:
 
 class TestGenerateErrorReport:
     def test_no_errors_returns_none(self, tmp_path):
-        result = generate_error_report([], tmp_path, "2026-02-16")
+        result = generate_error_report([], [], tmp_path, "2026-02-16")
         assert result is None
 
     def test_with_errors(self, tmp_path):
@@ -299,18 +299,34 @@ class TestGenerateErrorReport:
             {"source": "Gemini API", "message": "Rate limit exceeded"},
         ]
 
-        path = generate_error_report(errors, tmp_path, "2026-02-16")
+        path = generate_error_report(errors, [], tmp_path, "2026-02-16")
 
         assert path is not None
         content = path.read_text()
-        assert "Errors - 2026-02-16" in content
+        assert "2026-02-16" in content
         assert "YouTube/TestChannel" in content
         assert "No captions available" in content
         assert "Rate limit exceeded" in content
 
+    def test_with_skipped_items(self, tmp_path):
+        skipped = [{
+            "type": "youtube",
+            "source": "AI Explained",
+            "title": "Some Video",
+            "url": "https://youtube.com/watch?v=abc",
+            "reason": "YouTube IP block — transcript unavailable",
+            "action": "Refresh cookies.txt from a logged-in browser session, then re-run.",
+        }]
+        path = generate_error_report([], skipped, tmp_path, "2026-02-16")
+        assert path is not None
+        content = path.read_text()
+        assert "AI Explained" in content
+        assert "IP block" in content
+        assert "Refresh cookies" in content
+
     def test_creates_errors_directory(self, tmp_path):
         errors = [{"source": "test", "message": "test error"}]
-        generate_error_report(errors, tmp_path, "2026-02-16")
+        generate_error_report(errors, [], tmp_path, "2026-02-16")
         assert (tmp_path / "errors").is_dir()
 
 

@@ -60,3 +60,6 @@ settings:
   max_episodes_per_show: 1
   min_episodes_per_show: 1
   max_audio_minutes: 60
+  # Email notifications — set to your address to receive run reports
+  # Requires SMTP_USER + SMTP_PASSWORD env vars (see README)
+  notify_email: null
