@@ -96,7 +96,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
         logger.error(f"Configuration error: {e}")
         sys.exit(1)
 
-    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date_str = datetime.now().strftime("%Y-%m-%d")  # local time — avoids UTC date drift for late-night runs
     logger.info(f"Morning Brief run: {date_str}")
 
     # Load state
