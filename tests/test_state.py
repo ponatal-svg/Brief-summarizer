@@ -129,24 +129,36 @@ class TestGetRssCache:
 class TestMarkYoutubeProcessed:
     def test_adds_to_youtube_section(self):
         state = {}
+        mark_youtube_processed(state, "v1", "2026-02-16", channel="Test Ch", title="My Video")
+        entry = state["youtube"]["v1"]
+        assert entry["date"] == "2026-02-16"
+        assert entry["channel"] == "Test Ch"
+        assert entry["title"] == "My Video"
+
+    def test_adds_without_optional_fields(self):
+        state = {}
         mark_youtube_processed(state, "v1", "2026-02-16")
-        assert state["youtube"]["v1"] == "2026-02-16"
+        entry = state["youtube"]["v1"]
+        assert entry["date"] == "2026-02-16"
+        assert entry["channel"] == ""
+        assert entry["title"] == ""
 
     def test_migrates_legacy_flat_state(self):
         # Legacy state with flat video IDs at root level
         state = {"v_old": "2026-02-01"}
         mark_youtube_processed(state, "v_new", "2026-02-16")
         # Old entries should be migrated into youtube section
-        assert state["youtube"]["v_old"] == "2026-02-01"
-        assert state["youtube"]["v_new"] == "2026-02-16"
+        assert "v_old" in state["youtube"]
+        assert "v_new" in state["youtube"]
+        assert state["youtube"]["v_new"]["date"] == "2026-02-16"
         # Root level should be clean
         assert "v_old" not in state
 
     def test_appends_to_existing_youtube_section(self):
-        state = {"youtube": {"v1": "2026-02-15"}}
+        state = {"youtube": {"v1": "2026-02-15"}}  # legacy value
         mark_youtube_processed(state, "v2", "2026-02-16")
-        assert state["youtube"]["v1"] == "2026-02-15"
-        assert state["youtube"]["v2"] == "2026-02-16"
+        assert "v1" in state["youtube"]
+        assert state["youtube"]["v2"]["date"] == "2026-02-16"
 
 
 class TestMarkPodcastProcessed:

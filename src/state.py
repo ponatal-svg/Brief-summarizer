@@ -58,8 +58,25 @@ def get_processed_ids(state: dict) -> set:
         return set(youtube_state.keys())
     # Legacy: flat dict at root level (pre-podcast state files)
     # Filter out known non-video keys
-    reserved = {_KEY_YOUTUBE, _KEY_PODCASTS, _KEY_RSS_CACHE}
+    reserved = {_KEY_YOUTUBE, _KEY_PODCASTS, _KEY_RSS_CACHE, _KEY_IP_BLOCKED}
     return {k for k in state.keys() if k not in reserved}
+
+
+def get_youtube_entries(state: dict) -> dict:
+    """Return full youtube state: {video_id: {"date": str, "channel": str, "title": str}}.
+
+    Entries written before the rich-format migration have the value as a plain
+    date string — those are returned as {"date": date_str, "channel": "", "title": ""}.
+    """
+    raw = state.get(_KEY_YOUTUBE, {})
+    result = {}
+    for vid, val in raw.items():
+        if isinstance(val, dict):
+            result[vid] = val
+        else:
+            # Legacy: val is a plain date string
+            result[vid] = {"date": str(val), "channel": "", "title": ""}
+    return result
 
 
 def get_processed_podcast_ids(state: dict) -> set:
@@ -72,16 +89,27 @@ def get_rss_cache(state: dict) -> dict:
     return dict(state.get(_KEY_RSS_CACHE, {}))
 
 
-def mark_youtube_processed(state: dict, video_id: str, date_str: str) -> None:
-    """Record a YouTube video as processed."""
+def mark_youtube_processed(
+    state: dict,
+    video_id: str,
+    date_str: str,
+    channel: str = "",
+    title: str = "",
+) -> None:
+    """Record a YouTube video as processed.
+
+    Stores rich metadata {date, channel, title} so the status script can show
+    per-channel history without making network calls.  channel and title are
+    optional for backward-compat with callers that only have the video_id.
+    """
     if _KEY_YOUTUBE not in state:
         # Migrate legacy flat entries to nested format
-        reserved = {_KEY_YOUTUBE, _KEY_PODCASTS, _KEY_RSS_CACHE}
+        reserved = {_KEY_YOUTUBE, _KEY_PODCASTS, _KEY_RSS_CACHE, _KEY_IP_BLOCKED}
         legacy = {k: v for k, v in state.items() if k not in reserved}
         for k in legacy:
             del state[k]
         state[_KEY_YOUTUBE] = legacy
-    state[_KEY_YOUTUBE][video_id] = date_str
+    state[_KEY_YOUTUBE][video_id] = {"date": date_str, "channel": channel, "title": title}
 
 
 def mark_podcast_processed(state: dict, episode_id: str, date_str: str) -> None:
@@ -105,17 +133,29 @@ def get_ip_blocked(state: dict) -> dict:
     return dict(state.get(_KEY_IP_BLOCKED, {}))
 
 
-def mark_ip_blocked(state: dict, video_id: str, title: str, url: str, date_str: str) -> None:
+def mark_ip_blocked(
+    state: dict, video_id: str, title: str, url: str, date_str: str, channel: str = "",
+) -> None:
     """Record a video as IP-blocked so it is retried on the next run."""
     if _KEY_IP_BLOCKED not in state:
         state[_KEY_IP_BLOCKED] = {}
-    state[_KEY_IP_BLOCKED][video_id] = {"date": date_str, "title": title, "url": url}
+    state[_KEY_IP_BLOCKED][video_id] = {
+        "date": date_str, "title": title, "url": url, "channel": channel,
+    }
 
 
-def promote_ip_blocked(state: dict, video_id: str, date_str: str) -> None:
+def promote_ip_blocked(
+    state: dict, video_id: str, date_str: str,
+    channel: str = "", title: str = "",
+) -> None:
     """Move a video from ip_blocked to processed (transcript successfully fetched)."""
-    state.get(_KEY_IP_BLOCKED, {}).pop(video_id, None)
-    mark_youtube_processed(state, video_id, date_str)
+    info = state.get(_KEY_IP_BLOCKED, {}).pop(video_id, {})
+    # Use stored title/channel from the blocked entry if not provided by caller
+    mark_youtube_processed(
+        state, video_id, date_str,
+        channel=channel or info.get("channel", ""),
+        title=title or info.get("title", ""),
+    )
 
 
 def expire_ip_blocked(state: dict) -> list[str]:

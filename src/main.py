@@ -176,7 +176,8 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
             return False
 
         digest_entries.append({"video": video, "paths": paths, "error": None})
-        mark_youtube_processed(state, video.video_id, date_str)
+        mark_youtube_processed(state, video.video_id, date_str,
+                               channel=video.channel_name, title=video.title)
         logger.info(f"  Processed: {video.title}")
         return True
 
@@ -259,7 +260,8 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 "action": "Queued for automatic retry on next run. Refresh cookies.txt to resolve sooner.",
             })
             mark_ip_blocked(state, video_id, f"(IP-blocked: {video_id})",
-                            f"https://www.youtube.com/watch?v={video_id}", date_str)
+                            f"https://www.youtube.com/watch?v={video_id}", date_str,
+                            channel=source.name)
             continue
         except Exception as e:
             msg = f"Failed to fetch {source.name}: {e}"
