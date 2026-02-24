@@ -28,6 +28,9 @@ def _make_yta() -> YouTubeTranscriptApi:
 
     cookies.txt (Netscape format, exportable via browser extension) helps bypass
     YouTube IP blocks by authenticating requests with a real browser session.
+
+    Called fresh on every transcript fetch so that a refreshed cookies.txt on
+    disk is always picked up without requiring a process restart.
     """
     cookies_path = Path(__file__).parent.parent.parent / "cookies.txt"
     if cookies_path.exists():
@@ -40,10 +43,6 @@ def _make_yta() -> YouTubeTranscriptApi:
         except Exception:
             pass  # Fall through to cookieless instance
     return YouTubeTranscriptApi()
-
-
-# v1.x uses an instance-based API; create a module-level singleton
-_yta = _make_yta()
 
 from src.config import YouTubeSource
 
@@ -150,8 +149,16 @@ def fetch_new_videos(
     return videos
 
 
+_CHANNEL_FETCH_RETRIES = 3
+_CHANNEL_FETCH_BACKOFF_SECONDS = [10, 20]  # wait before retry 2 and 3
+
+
 def _get_channel_entries(channel_url: str, max_videos: int) -> list:
-    """Get recent video metadata from a channel using yt-dlp."""
+    """Get recent video metadata from a channel using yt-dlp.
+
+    Retries up to _CHANNEL_FETCH_RETRIES times on network/DNS errors,
+    which covers transient failures like brief DNS outages mid-run.
+    """
     videos_url = f"{channel_url.rstrip('/')}/videos"
     cmd = [
         "yt-dlp",
@@ -162,38 +169,67 @@ def _get_channel_entries(channel_url: str, max_videos: int) -> list:
         videos_url,
     ]
 
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except subprocess.TimeoutExpired:
-        logger.error(f"Timeout fetching channel: {channel_url}")
-        return []
-    except FileNotFoundError:
-        logger.error("yt-dlp not found. Install it: pip install yt-dlp")
-        return []
-
-    if result.returncode != 0:
-        logger.error(f"yt-dlp error for {channel_url}: {result.stderr.strip()}")
-        return []
-
-    entries = []
-    for line in result.stdout.strip().split("\n"):
-        if not line:
-            continue
+    for attempt in range(_CHANNEL_FETCH_RETRIES):
         try:
-            entries.append(json.loads(line))
-        except json.JSONDecodeError:
-            logger.warning(f"Failed to parse yt-dlp JSON line: {line[:100]}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            if attempt < _CHANNEL_FETCH_RETRIES - 1:
+                wait = _CHANNEL_FETCH_BACKOFF_SECONDS[attempt]
+                logger.warning(f"  Timeout fetching channel (attempt {attempt + 1}), retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            logger.error(f"Timeout fetching channel after {_CHANNEL_FETCH_RETRIES} attempts: {channel_url}")
+            return []
+        except FileNotFoundError:
+            logger.error("yt-dlp not found. Install it: pip install yt-dlp")
+            return []
 
-    return entries
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            # DNS / network errors are retryable; yt-dlp exits non-zero and prints to stderr
+            is_network_error = any(kw in stderr.lower() for kw in [
+                "nodename nor servname", "name or service not known",
+                "network is unreachable", "connection timed out", "failed to resolve",
+            ])
+            if is_network_error and attempt < _CHANNEL_FETCH_RETRIES - 1:
+                wait = _CHANNEL_FETCH_BACKOFF_SECONDS[attempt]
+                logger.warning(f"  Network error fetching channel (attempt {attempt + 1}), retrying in {wait}s: {stderr[:120]}")
+                time.sleep(wait)
+                continue
+            logger.error(f"yt-dlp error for {channel_url}: {stderr}")
+            return []
+
+        # Parse successful output
+        entries = []
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse yt-dlp JSON line: {line[:100]}")
+        return entries
+
+    return []
+
+
+_IP_BLOCK_RETRIES = 3
+_IP_BLOCK_BACKOFF_SECONDS = [30, 60, 120]  # wait before each retry
 
 
 def _get_transcript(video_id: str, language: str = "en") -> tuple:
     """Fetch transcript for a video using youtube-transcript-api.
+
+    Creates a fresh API instance per call so that a refreshed cookies.txt on
+    disk is always picked up without requiring a process restart.
+
+    Retries up to _IP_BLOCK_RETRIES times on IpBlocked with exponential backoff,
+    since YouTube IP blocks are often temporary rate-limits that lift within minutes.
 
     Tries the configured language first, then English, then any available language.
 
@@ -208,26 +244,42 @@ def _get_transcript(video_id: str, language: str = "en") -> tuple:
     else:
         languages = [language, "en", "en-US", "en-GB"]
 
-    # First attempt: try preferred languages
-    try:
-        raw = _yta.fetch(video_id, languages=languages)
-        text = " ".join(snippet.text for snippet in raw)
-        if text.strip():
-            return text, _sample_segments(raw)
-    except IpBlocked:
-        logger.warning(f"  YouTube IP block detected — refresh cookies.txt to restore access")
-        return None, ()
-    except (TranscriptsDisabled, VideoUnavailable):
-        logger.info(f"  No transcript available for {video_id}")
-        return None, ()
-    except NoTranscriptFound:
-        pass  # Fall through to try any available language
-    except Exception as e:
-        logger.warning(f"  Transcript fetch failed for {video_id}: {e}")
+    for attempt in range(_IP_BLOCK_RETRIES):
+        # Fresh instance each attempt — picks up latest cookies.txt from disk
+        yta = _make_yta()
 
-    # Second attempt: try ANY available transcript language
+        try:
+            raw = yta.fetch(video_id, languages=languages)
+            text = " ".join(snippet.text for snippet in raw)
+            if text.strip():
+                return text, _sample_segments(raw)
+        except IpBlocked:
+            if attempt < _IP_BLOCK_RETRIES - 1:
+                wait = _IP_BLOCK_BACKOFF_SECONDS[attempt]
+                logger.warning(
+                    f"  YouTube IP block detected (attempt {attempt + 1}/{_IP_BLOCK_RETRIES}) "
+                    f"— retrying in {wait}s"
+                )
+                time.sleep(wait)
+                continue
+            logger.warning(
+                f"  YouTube IP block persists after {_IP_BLOCK_RETRIES} attempts — "
+                f"refresh cookies.txt to restore access"
+            )
+            return None, ()
+        except (TranscriptsDisabled, VideoUnavailable):
+            logger.info(f"  No transcript available for {video_id}")
+            return None, ()
+        except NoTranscriptFound:
+            break  # Fall through to try any available language
+        except Exception as e:
+            logger.warning(f"  Transcript fetch failed for {video_id}: {e}")
+            break
+
+    # Final attempt: try ANY available transcript language
     try:
-        transcript_list = _yta.list(video_id)
+        yta = _make_yta()
+        transcript_list = yta.list(video_id)
         available = list(transcript_list)
         if available:
             first = available[0]

@@ -337,6 +337,11 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
         f"{len(errors)} errors, {len(skipped_items)} skipped"
     )
 
+    # Exit with non-zero code if anything was skipped/errored — lets cron jobs
+    # detect partial failures and trigger alerts (e.g. MAILTO in crontab).
+    if errors or skipped_items:
+        sys.exit(1)
+
 
 def _save_and_generate(
     state: dict,

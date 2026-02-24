@@ -150,11 +150,12 @@ class TestYouTubePipeline:
                                             with patch("src.main.save_state"):
                                                 with patch("src.main.cleanup_old_content", return_value=[]):
                                                     with patch("src.main.cleanup_state"):
-                                                        run(
-                                                            config_path=tmp_path / "config.yaml",
-                                                            output_dir=tmp_path / "output",
-                                                            state_path=tmp_path / "state.json",
-                                                        )
+                                                        with pytest.raises(SystemExit):
+                                                            run(
+                                                                config_path=tmp_path / "config.yaml",
+                                                                output_dir=tmp_path / "output",
+                                                                state_path=tmp_path / "state.json",
+                                                            )
 
         mock_summarize.assert_not_called()
 
@@ -170,11 +171,12 @@ class TestYouTubePipeline:
                                         with patch("src.main.save_state"):
                                             with patch("src.main.cleanup_old_content", return_value=[]):
                                                 with patch("src.main.cleanup_state"):
-                                                    run(
-                                                        config_path=tmp_path / "config.yaml",
-                                                        output_dir=tmp_path / "output",
-                                                        state_path=tmp_path / "state.json",
-                                                    )
+                                                    with pytest.raises(SystemExit):
+                                                        run(
+                                                            config_path=tmp_path / "config.yaml",
+                                                            output_dir=tmp_path / "output",
+                                                            state_path=tmp_path / "state.json",
+                                                        )
 
         # Pipeline should continue and generate output despite error
         mock_digest.assert_called_once()
@@ -217,11 +219,12 @@ class TestYouTubePipeline:
                                             with patch("src.main.save_state"):
                                                 with patch("src.main.cleanup_old_content", return_value=[]):
                                                     with patch("src.main.cleanup_state"):
-                                                        run(
-                                                            config_path=tmp_path / "config.yaml",
-                                                            output_dir=tmp_path / "output",
-                                                            state_path=tmp_path / "state.json",
-                                                        )
+                                                        with pytest.raises(SystemExit):
+                                                            run(
+                                                                config_path=tmp_path / "config.yaml",
+                                                                output_dir=tmp_path / "output",
+                                                                state_path=tmp_path / "state.json",
+                                                            )
 
         # Digest should have NO error entries (errors go to log only)
         call_args = mock_digest.call_args[0]
@@ -284,11 +287,12 @@ class TestPodcastPipeline:
                                         with patch("src.main.save_state"):
                                             with patch("src.main.cleanup_old_content", return_value=[]):
                                                 with patch("src.main.cleanup_state"):
-                                                    run(
-                                                        config_path=tmp_path / "config.yaml",
-                                                        output_dir=tmp_path / "output",
-                                                        state_path=tmp_path / "state.json",
-                                                    )
+                                                    with pytest.raises(SystemExit):
+                                                        run(
+                                                            config_path=tmp_path / "config.yaml",
+                                                            output_dir=tmp_path / "output",
+                                                            state_path=tmp_path / "state.json",
+                                                        )
 
         # Error should be recorded
         error_call_args = mock_err.call_args[0]
@@ -314,11 +318,12 @@ class TestPodcastPipeline:
                                             with patch("src.main.save_state"):
                                                 with patch("src.main.cleanup_old_content", return_value=[]):
                                                     with patch("src.main.cleanup_state"):
-                                                        run(
-                                                            config_path=tmp_path / "config.yaml",
-                                                            output_dir=tmp_path / "output",
-                                                            state_path=tmp_path / "state.json",
-                                                        )
+                                                        with pytest.raises(SystemExit):
+                                                            run(
+                                                                config_path=tmp_path / "config.yaml",
+                                                                output_dir=tmp_path / "output",
+                                                                state_path=tmp_path / "state.json",
+                                                            )
 
         # Podcast digest should have NO error entries
         call_args = mock_pd.call_args[0]

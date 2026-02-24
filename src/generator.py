@@ -206,6 +206,8 @@ def generate_podcast_daily_digest(
                     f"**{ep.show_name}** | {duration} | {pub_date} | "
                     f"[Listen]({ep.episode_url})"
                 )
+                # Embed stable episode ID as HTML comment for merge deduplication
+                lines.append(f"<!-- episode_id: {ep.episode_id} -->")
                 lines.append("")
 
                 if error:
@@ -266,11 +268,11 @@ def _parse_existing_podcast_digest(digest_path: Path, output_dir: Path) -> list:
             listen_match = re.search(r'\[Listen\]\(([^)]+)\)', line)
             if listen_match:
                 current["listen_url"] = listen_match.group(1)
-                # Use URL hash as stable ID for existing entries
-                import hashlib
-                current["episode_id"] = hashlib.sha1(
-                    current["listen_url"].encode()
-                ).hexdigest()[:16]
+        elif current and line.startswith("<!-- episode_id:"):
+            # Stable ID embedded by the generator — use this for deduplication
+            id_match = re.search(r'<!-- episode_id: ([a-f0-9]+) -->', line)
+            if id_match:
+                current["episode_id"] = id_match.group(1)
         elif current and line.startswith("[Summary]"):
             match = re.search(r'\[Summary\]\(([^)]+)\)', line)
             if match:

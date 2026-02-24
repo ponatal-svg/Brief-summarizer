@@ -151,66 +151,99 @@ class TestSampleSegments:
 class TestGetTranscript:
     """Tests for _get_transcript().
 
-    Patches the module-level _yta instance (youtube-transcript-api v1.x).
+    Patches _make_yta() so each call gets a fresh mock instance.
     Snippets are FakeSnippet dataclass objects with .text and .start attributes.
     Returns (text, segments) tuple.
     """
 
+    def _mock_yta(self, fetch_return=None, fetch_side_effect=None,
+                  list_return=None, list_side_effect=None):
+        """Return a mock YTA instance."""
+        mock = MagicMock()
+        if fetch_side_effect is not None:
+            mock.fetch.side_effect = fetch_side_effect
+        elif fetch_return is not None:
+            mock.fetch.return_value = fetch_return
+        if list_side_effect is not None:
+            mock.list.side_effect = list_side_effect
+        elif list_return is not None:
+            mock.list.return_value = list_return
+        return mock
+
     def test_successful_fetch_returns_text(self):
         snippets = make_snippets(("Hello", 0.0), ("world", 1.0))
+        mock_yta = self._mock_yta(fetch_return=snippets)
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.return_value = snippets
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert text == "Hello world"
-        mock_yta.fetch.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_with("abc123", languages=["en", "en-US", "en-GB"])
 
     def test_successful_fetch_returns_segments(self):
         snippets = make_snippets(("Hello", 0.0), ("world", 45.0))
+        mock_yta = self._mock_yta(fetch_return=snippets)
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.return_value = snippets
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert isinstance(segments, tuple)
         assert len(segments) >= 1
-        # First segment at t=0 should always be included
         assert segments[0][0] == 0
         assert segments[0][1] == "Hello"
 
     def test_no_transcript_available(self):
         from youtube_transcript_api._errors import TranscriptsDisabled
+        mock_yta = self._mock_yta(fetch_side_effect=TranscriptsDisabled("abc123"))
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = TranscriptsDisabled("abc123")
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert text is None
         assert segments == ()
 
-    def test_ip_blocked_returns_none_gracefully(self):
-        """IpBlocked (YouTube blocking our IP) should return None, not raise."""
+    def test_ip_blocked_retries_then_returns_none(self):
+        """IpBlocked should retry _IP_BLOCK_RETRIES times then return None."""
         from youtube_transcript_api._errors import IpBlocked
+        mock_yta = self._mock_yta(fetch_side_effect=IpBlocked("abc123"))
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = IpBlocked("abc123")
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta), \
+             patch("src.fetchers.youtube.time.sleep"):
             text, segments = _get_transcript("abc123")
 
         assert text is None
         assert segments == ()
+        # Should have retried _IP_BLOCK_RETRIES times
+        import src.fetchers.youtube as yt_mod
+        assert mock_yta.fetch.call_count == yt_mod._IP_BLOCK_RETRIES
+
+    def test_ip_blocked_succeeds_on_retry(self):
+        """IpBlocked on first attempt, succeeds on second — should return text."""
+        from youtube_transcript_api._errors import IpBlocked
+        snippets = make_snippets(("Hello", 0.0))
+        mock_yta = self._mock_yta(
+            fetch_side_effect=[IpBlocked("abc123"), snippets]
+        )
+
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta), \
+             patch("src.fetchers.youtube.time.sleep"):
+            text, segments = _get_transcript("abc123")
+
+        assert text == "Hello"
+        assert mock_yta.fetch.call_count == 2
 
     def test_no_transcript_found_falls_back_to_list(self):
         from youtube_transcript_api._errors import NoTranscriptFound
-
         snippets = make_snippets(("Hola", 0.0))
         mock_transcript = MagicMock()
         mock_transcript.language_code = "es"
         mock_transcript.fetch.return_value = snippets
+        mock_yta = self._mock_yta(
+            fetch_side_effect=NoTranscriptFound("abc123", [], []),
+            list_return=[mock_transcript],
+        )
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
-            mock_yta.list.return_value = [mock_transcript]
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert text == "Hola"
@@ -218,40 +251,45 @@ class TestGetTranscript:
 
     def test_video_unavailable(self):
         from youtube_transcript_api._errors import VideoUnavailable
+        mock_yta = self._mock_yta(fetch_side_effect=VideoUnavailable("abc123"))
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = VideoUnavailable("abc123")
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert text is None
         assert segments == ()
 
     def test_generic_error_falls_back_to_list(self):
-        """A generic error on fetch() tries list() next."""
         snippets = make_snippets(("fallback", 0.0))
         mock_transcript = MagicMock()
         mock_transcript.language_code = "en"
         mock_transcript.fetch.return_value = snippets
+        mock_yta = self._mock_yta(
+            fetch_side_effect=RuntimeError("network error"),
+            list_return=[mock_transcript],
+        )
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = RuntimeError("network error")
-            mock_yta.list.return_value = [mock_transcript]
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert text == "fallback"
 
     def test_both_attempts_fail_returns_none(self):
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = RuntimeError("fail")
-            mock_yta.list.side_effect = RuntimeError("also fail")
+        mock_yta = self._mock_yta(
+            fetch_side_effect=RuntimeError("fail"),
+            list_side_effect=RuntimeError("also fail"),
+        )
+
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert text is None
         assert segments == ()
 
     def test_empty_transcript_returns_none(self):
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.return_value = []
+        mock_yta = self._mock_yta(fetch_return=[])
+
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123")
 
         assert text is None
@@ -271,17 +309,48 @@ class TestGetChannelEntries:
             assert len(result) == 2
             assert result[0]["id"] == "v1"
 
-    def test_yt_dlp_error(self):
-        mock_result = MagicMock(returncode=1, stdout="", stderr="Error")
-        with patch("subprocess.run", return_value=mock_result):
+    def test_yt_dlp_non_network_error_no_retry(self):
+        """Non-network yt-dlp errors should fail immediately without retrying."""
+        mock_result = MagicMock(returncode=1, stdout="", stderr="Error: video not found")
+        with patch("subprocess.run", return_value=mock_result) as mock_run, \
+             patch("src.fetchers.youtube.time.sleep"):
             result = _get_channel_entries("https://www.youtube.com/@Test", 3)
             assert result == []
+            assert mock_run.call_count == 1  # no retry for non-network errors
 
-    def test_timeout(self):
-        import subprocess
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 60)):
+    def test_yt_dlp_dns_error_retries(self):
+        """DNS errors should be retried up to _CHANNEL_FETCH_RETRIES times."""
+        import src.fetchers.youtube as yt_mod
+        dns_error = MagicMock(returncode=1, stdout="", stderr="Failed to resolve 'www.youtube.com'")
+        success_entries = [{"id": "v1", "title": "Video 1"}]
+        success = MagicMock(returncode=0, stdout=json.dumps(success_entries[0]), stderr="")
+
+        with patch("subprocess.run", side_effect=[dns_error, success]) as mock_run, \
+             patch("src.fetchers.youtube.time.sleep"):
+            result = _get_channel_entries("https://www.youtube.com/@Test", 3)
+            assert len(result) == 1
+            assert result[0]["id"] == "v1"
+            assert mock_run.call_count == 2
+
+    def test_yt_dlp_dns_error_all_retries_exhausted(self):
+        """All retries exhausted on DNS error returns empty list."""
+        import src.fetchers.youtube as yt_mod
+        dns_error = MagicMock(returncode=1, stdout="", stderr="nodename nor servname provided")
+        with patch("subprocess.run", return_value=dns_error) as mock_run, \
+             patch("src.fetchers.youtube.time.sleep"):
             result = _get_channel_entries("https://www.youtube.com/@Test", 3)
             assert result == []
+            assert mock_run.call_count == yt_mod._CHANNEL_FETCH_RETRIES
+
+    def test_timeout_retries(self):
+        """Timeout should be retried, then return empty list."""
+        import subprocess
+        import src.fetchers.youtube as yt_mod
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 60)) as mock_run, \
+             patch("src.fetchers.youtube.time.sleep"):
+            result = _get_channel_entries("https://www.youtube.com/@Test", 3)
+            assert result == []
+            assert mock_run.call_count == yt_mod._CHANNEL_FETCH_RETRIES
 
     def test_yt_dlp_not_found(self):
         with patch("subprocess.run", side_effect=FileNotFoundError()):
@@ -472,31 +541,34 @@ class TestFetchNewVideos:
 class TestGetTranscriptLanguage:
     def test_english_default_languages(self):
         snippets = make_snippets(("Hello", 0.0))
+        mock_yta = MagicMock()
+        mock_yta.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.return_value = snippets
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             _get_transcript("abc123", language="en")
 
-        mock_yta.fetch.assert_called_once_with("abc123", languages=["en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_with("abc123", languages=["en", "en-US", "en-GB"])
 
     def test_spanish_language_priority(self):
         snippets = make_snippets(("Hola", 0.0))
+        mock_yta = MagicMock()
+        mock_yta.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.return_value = snippets
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, _ = _get_transcript("abc123", language="es")
 
-        mock_yta.fetch.assert_called_once_with("abc123", languages=["es", "en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_with("abc123", languages=["es", "en", "en-US", "en-GB"])
         assert text == "Hola"
 
     def test_hebrew_language_priority(self):
         snippets = make_snippets(("שלום", 0.0))
+        mock_yta = MagicMock()
+        mock_yta.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.return_value = snippets
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, _ = _get_transcript("abc123", language="he")
 
-        mock_yta.fetch.assert_called_once_with("abc123", languages=["he", "en", "en-US", "en-GB"])
+        mock_yta.fetch.assert_called_with("abc123", languages=["he", "en", "en-US", "en-GB"])
         assert text == "שלום"
 
     def test_falls_back_to_any_available_language(self):
@@ -508,9 +580,11 @@ class TestGetTranscriptLanguage:
         mock_transcript_obj.language_code = "es"
         mock_transcript_obj.fetch.return_value = snippets
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
-            mock_yta.list.return_value = [mock_transcript_obj]
+        mock_yta = MagicMock()
+        mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
+        mock_yta.list.return_value = [mock_transcript_obj]
+
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, _ = _get_transcript("abc123", language="es")
 
         assert text == "Hola mundo"
@@ -520,9 +594,11 @@ class TestGetTranscriptLanguage:
         """When no transcripts exist at all, should return None gracefully."""
         from youtube_transcript_api._errors import NoTranscriptFound
 
-        with patch("src.fetchers.youtube._yta") as mock_yta:
-            mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
-            mock_yta.list.return_value = []
+        mock_yta = MagicMock()
+        mock_yta.fetch.side_effect = NoTranscriptFound("abc123", [], [])
+        mock_yta.list.return_value = []
+
+        with patch("src.fetchers.youtube._make_yta", return_value=mock_yta):
             text, segments = _get_transcript("abc123", language="es")
 
         assert text is None
