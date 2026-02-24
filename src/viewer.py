@@ -451,6 +451,7 @@ body {
 /* ===== STATE ===== */
 var CATEGORIES = {};
 var DIGEST_INDEX = [];
+var DIGEST_COUNTS = {};  // date -> number of summaries (pre-computed server-side)
 var currentDate = '';
 var currentFilter = 'all';
 var allExpanded = false;
@@ -549,6 +550,11 @@ async function init() {
     DIGEST_INDEX = idxResp.ok ? await idxResp.json() : [];
   } catch(e) { DIGEST_INDEX = []; }
 
+  try {
+    var cntResp = await fetch('digest-counts.json');
+    DIGEST_COUNTS = cntResp.ok ? await cntResp.json() : {};
+  } catch(e) { DIGEST_COUNTS = {}; }
+
   DIGEST_INDEX = DIGEST_INDEX.sort().reverse();
 
   if (DIGEST_INDEX.length === 0) {
@@ -564,8 +570,10 @@ async function init() {
     btn.dataset.date = d;
     // Display MM/DD — compact enough to fit 7 buttons in a row
     var parts = d.split('-');
-    btn.textContent = parts[1] + '/' + parts[2];
-    btn.title = d;  // full date on hover
+    var count = DIGEST_COUNTS[d] || 0;
+    btn.innerHTML = parts[1] + '/' + parts[2] +
+      (count > 0 ? ' <span style="font-size:10px;opacity:0.65">(' + count + ')</span>' : '');
+    btn.title = d + ' — ' + count + ' summar' + (count === 1 ? 'y' : 'ies');
     // Pass explicit=true so loadDate never auto-falls-back on user clicks
     btn.onclick = function() { loadDate(d, false, true); };
     nav.appendChild(btn);
@@ -1334,16 +1342,31 @@ def generate_viewer(config: Config, output_dir: Path) -> None:
     cat_path.write_text(json.dumps(categories, indent=2), encoding="utf-8")
 
     # Write/update digest-index.json (list of available YouTube digest dates)
+    # Also write digest-counts.json ({date: summary_count}) so the viewer can
+    # display per-date counts on the date buttons without client-side fetching.
     daily_dir = output_dir / "daily"
     dates = []
+    digest_counts = {}
     if daily_dir.exists():
-        dates = sorted([
-            f.stem for f in daily_dir.glob("*.md")
-            if len(f.stem) == 10  # YYYY-MM-DD
-        ])
+        for f in daily_dir.glob("*.md"):
+            if len(f.stem) != 10:
+                continue
+            dates.append(f.stem)
+            # Count ### headings = number of summaries in this digest
+            try:
+                text = f.read_text(encoding="utf-8")
+                digest_counts[f.stem] = sum(
+                    1 for line in text.splitlines() if line.startswith("### ")
+                )
+            except OSError:
+                digest_counts[f.stem] = 0
+        dates = sorted(dates)
 
     index_json_path = output_dir / "digest-index.json"
     index_json_path.write_text(json.dumps(dates, indent=2), encoding="utf-8")
+
+    counts_json_path = output_dir / "digest-counts.json"
+    counts_json_path.write_text(json.dumps(digest_counts, indent=2), encoding="utf-8")
 
     # Write/update podcast-index.json (list of available podcast digest dates)
     podcast_daily_dir = output_dir / "podcast-daily"

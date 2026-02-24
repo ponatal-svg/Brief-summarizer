@@ -438,6 +438,7 @@ body {
 /* ===== STATE ===== */
 var CATEGORIES = {};
 var DIGEST_INDEX = [];
+var DIGEST_COUNTS = {};  // date -> number of summaries (pre-computed server-side)
 var currentDate = '';
 var currentFilter = 'all';
 var allExpanded = false;
@@ -536,6 +537,11 @@ async function init() {
     DIGEST_INDEX = idxResp.ok ? await idxResp.json() : [];
   } catch(e) { DIGEST_INDEX = []; }
 
+  try {
+    var cntResp = await fetch('digest-counts.json');
+    DIGEST_COUNTS = cntResp.ok ? await cntResp.json() : {};
+  } catch(e) { DIGEST_COUNTS = {}; }
+
   DIGEST_INDEX = DIGEST_INDEX.sort().reverse();
 
   if (DIGEST_INDEX.length === 0) {
@@ -551,8 +557,10 @@ async function init() {
     btn.dataset.date = d;
     // Display MM/DD — compact enough to fit 7 buttons in a row
     var parts = d.split('-');
-    btn.textContent = parts[1] + '/' + parts[2];
-    btn.title = d;  // full date on hover
+    var count = DIGEST_COUNTS[d] || 0;
+    btn.innerHTML = parts[1] + '/' + parts[2] +
+      (count > 0 ? ' <span style="font-size:10px;opacity:0.65">(' + count + ')</span>' : '');
+    btn.title = d + ' — ' + count + ' summar' + (count === 1 ? 'y' : 'ies');
     // Pass explicit=true so loadDate never auto-falls-back on user clicks
     btn.onclick = function() { loadDate(d, false, true); };
     nav.appendChild(btn);
