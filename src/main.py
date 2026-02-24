@@ -52,6 +52,41 @@ from src.viewer import generate_viewer
 logger = logging.getLogger(__name__)
 
 
+def _print_dry_run_table(items: list[tuple[str, str, str, str]]) -> None:
+    """Print a formatted table of items that would be processed on a real run."""
+    BOLD  = "\033[1m"
+    DIM   = "\033[2m"
+    GREEN = "\033[32m"
+    RESET = "\033[0m"
+
+    print()  # blank line after log output
+    if not items:
+        print(f"{BOLD}Dry run complete — nothing to process.{RESET}")
+        print(f"{DIM}All sources are up to date within the lookback window.{RESET}")
+        return
+
+    print(f"{BOLD}Dry run complete — {len(items)} item(s) would be processed:{RESET}\n")
+
+    col_type   = max(len("Type"),   max(len(t[0]) for t in items))
+    col_source = max(len("Source"), max(len(t[1]) for t in items))
+    col_cat    = max(len("Category"), max(len(t[2]) for t in items))
+    # Title gets the rest; cap at 60 chars
+    col_title  = min(60, max(len("Title"), max(len(t[3]) for t in items)))
+
+    header = (
+        f"  {'Type':<{col_type}}  {'Source':<{col_source}}  "
+        f"{'Category':<{col_cat}}  {'Title':<{col_title}}"
+    )
+    sep = "  " + "-" * (col_type + col_source + col_cat + col_title + 6)
+    print(f"{BOLD}{header}{RESET}")
+    print(sep)
+    for typ, source, category, title in items:
+        truncated = title if len(title) <= col_title else title[:col_title - 1] + "…"
+        print(f"  {GREEN}{typ:<{col_type}}{RESET}  {source:<{col_source}}  "
+              f"{DIM}{category:<{col_cat}}{RESET}  {truncated}")
+    print()
+
+
 def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = False) -> None:
     """Run the full Morning Brief pipeline (YouTube + Podcasts)."""
     # Load config
@@ -102,6 +137,8 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
     # Each entry: {"type": "youtube"|"podcast", "source": str, "title": str,
     #              "url": str, "reason": str, "action": str}
     skipped_items = []
+    # Dry-run only: (type, source, category, title) tuples collected for summary table
+    dry_run_items: list[tuple[str, str, str, str]] = []
 
     # -----------------------------------------------------------------------
     # YouTube pipeline
@@ -279,7 +316,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
 
         for video in videos:
             if dry_run:
-                logger.info(f"  [DRY RUN] Would process: {video.title}")
+                dry_run_items.append(("YouTube", source.name, source.category, video.title))
                 continue
 
             try:
@@ -346,7 +383,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
 
         for episode in episodes:
             if dry_run:
-                logger.info(f"  [DRY RUN] Would process podcast: {episode.title}")
+                dry_run_items.append(("Podcast", show.name, show.category, episode.title))
                 continue
 
             try:
@@ -427,7 +464,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
             processed_episode_ids.add(episode.episode_id)
 
     if dry_run:
-        logger.info("Dry run complete. No files generated.")
+        _print_dry_run_table(dry_run_items)
         return
 
     _save_and_generate(
