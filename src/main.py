@@ -17,7 +17,7 @@ except ImportError:
 
 from src.cleanup import cleanup_old_content, cleanup_state
 from src.config import load_config, ConfigError
-from src.fetchers.youtube import fetch_new_videos
+from src.fetchers.youtube import fetch_new_videos, IpBlockedError
 from src.fetchers.podcast import (
     fetch_new_episodes,
     download_and_transcribe,
@@ -37,8 +37,12 @@ from src.state import (
     get_processed_ids,
     get_processed_podcast_ids,
     get_rss_cache,
+    get_ip_blocked,
     mark_youtube_processed,
     mark_podcast_processed,
+    mark_ip_blocked,
+    promote_ip_blocked,
+    expire_ip_blocked,
     update_rss_cache,
 )
 from src.summarizer import create_client, summarize, QuotaExhaustedError
@@ -65,6 +69,18 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
     processed_video_ids = get_processed_ids(state)
     processed_episode_ids = get_processed_podcast_ids(state)
     rss_cache = get_rss_cache(state)
+
+    # Expire ip_blocked entries older than TTL, then load survivors for retry
+    expired = expire_ip_blocked(state)
+    if expired:
+        logger.info(f"Expired {len(expired)} ip_blocked video(s) past TTL: {expired}")
+    ip_blocked_videos = get_ip_blocked(state)
+    if ip_blocked_videos:
+        logger.info(
+            f"IP-blocked queue: {len(ip_blocked_videos)} video(s) pending retry — "
+            + ", ".join(info.get("title", vid) for vid, info in ip_blocked_videos.items())
+        )
+
     logger.info(
         f"Previously processed: {len(processed_video_ids)} videos, "
         f"{len(processed_episode_ids)} podcast episodes"
@@ -90,6 +106,137 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
     # -----------------------------------------------------------------------
     # YouTube pipeline
     # -----------------------------------------------------------------------
+
+    def _process_video(video) -> bool:
+        """Summarize and generate output for a single video.
+
+        Returns True on success, False if summarization failed (non-fatal).
+        Raises QuotaExhaustedError / sys.exit on fatal errors.
+        """
+        nonlocal digest_entries, errors, skipped_items
+
+        if not video.transcript:
+            msg = f"No transcript available for '{video.title}' — skipping"
+            logger.warning(msg)
+            errors.append({"source": f"Transcript/{video.channel_name}", "message": msg})
+            skipped_items.append({
+                "type": "youtube",
+                "source": video.channel_name,
+                "title": video.title,
+                "url": video.url,
+                "reason": "Transcript unavailable (captions disabled or video unavailable)",
+                "action": "No action needed — captions are disabled for this video.",
+            })
+            return False
+
+        try:
+            summary = summarize(
+                client=gemini_client,
+                model=config.settings.gemini_model,
+                title=video.title,
+                channel_name=video.channel_name,
+                transcript=video.transcript,
+                duration_seconds=video.duration_seconds,
+                language=video.language,
+                transcript_segments=video.transcript_segments,
+            )
+        except QuotaExhaustedError:
+            raise  # bubble up to caller for early-exit handling
+        except Exception as e:
+            error_str = str(e).lower()
+            if "401" in str(e) or "403" in str(e) or "api_key_invalid" in error_str or "permission_denied" in error_str:
+                logger.error(f"UNRECOVERABLE: Gemini auth failed — check GEMINI_API_KEY: {e}")
+                errors.append({"source": "Gemini/AuthError", "message": str(e)})
+                generate_error_report(errors, skipped_items, output_dir, date_str)
+                sys.exit(1)
+            msg = f"Summarization failed for '{video.title}': {e}"
+            logger.error(msg)
+            errors.append({"source": f"Gemini/{video.channel_name}", "message": msg})
+            skipped_items.append({
+                "type": "youtube",
+                "source": video.channel_name,
+                "title": video.title,
+                "url": video.url,
+                "reason": f"Gemini summarization error: {e}",
+                "action": "Transient API error — will retry on next run.",
+            })
+            return False
+
+        try:
+            paths = generate_summary_files(
+                video=video,
+                summary=summary,
+                output_dir=output_dir,
+                date_str=date_str,
+            )
+        except Exception as e:
+            msg = f"Failed to write summary files for '{video.title}': {e}"
+            logger.error(msg)
+            errors.append({"source": f"FileWrite/{video.channel_name}", "message": msg})
+            return False
+
+        digest_entries.append({"video": video, "paths": paths, "error": None})
+        mark_youtube_processed(state, video.video_id, date_str)
+        logger.info(f"  Processed: {video.title}")
+        return True
+
+    # Retry previously IP-blocked videos first (they bypass the lookback window)
+    if ip_blocked_videos and not dry_run:
+        from src.fetchers.youtube import _get_transcript, VideoInfo as _VideoInfo
+        logger.info(f"Retrying {len(ip_blocked_videos)} previously IP-blocked video(s)...")
+        for video_id, info in list(ip_blocked_videos.items()):
+            title = info.get("title", video_id)
+            url = info.get("url", f"https://www.youtube.com/watch?v={video_id}")
+            logger.info(f"  Retrying IP-blocked: {title}")
+            try:
+                transcript, segments = _get_transcript(video_id)
+            except IpBlockedError:
+                logger.warning(f"  Still IP-blocked: {title}")
+                skipped_items.append({
+                    "type": "youtube",
+                    "source": "(IP-blocked retry)",
+                    "title": title,
+                    "url": url,
+                    "reason": "YouTube IP block persists",
+                    "action": "Refresh cookies.txt from a logged-in browser session, then re-run.",
+                })
+                continue
+            except Exception as e:
+                logger.warning(f"  Retry failed for {title}: {e}")
+                continue
+
+            # Transcript recovered — build a minimal VideoInfo and process it
+            video = _VideoInfo(
+                video_id=video_id,
+                title=title,
+                url=url,
+                channel_name="(recovered)",
+                category="",
+                upload_date=datetime.now(timezone.utc),
+                duration_seconds=0,
+                transcript=transcript,
+                transcript_segments=segments,
+            )
+            try:
+                _process_video(video)
+                promote_ip_blocked(state, video_id, date_str)
+                logger.info(f"  Recovered from IP-blocked queue: {title}")
+            except QuotaExhaustedError as e:
+                errors.append({"source": "Gemini/QuotaExhausted", "message": str(e)})
+                skipped_items.append({
+                    "type": "youtube",
+                    "source": "(IP-blocked retry)",
+                    "title": title,
+                    "url": url,
+                    "reason": "Gemini daily quota exhausted during retry",
+                    "action": "Quota resets at midnight Pacific. Re-run tomorrow.",
+                })
+                _save_and_generate(
+                    state, state_path, rss_cache, digest_entries, podcast_entries,
+                    errors, skipped_items, output_dir, date_str, config,
+                )
+                return
+
     for source in config.youtube_sources:
         try:
             videos = fetch_new_videos(
@@ -98,6 +245,22 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 lookback_hours=config.settings.lookback_hours,
                 max_videos=config.settings.max_videos_per_channel,
             )
+        except IpBlockedError as e:
+            video_id = str(e)
+            msg = f"YouTube IP block for {source.name} — video {video_id} queued for retry"
+            logger.warning(msg)
+            errors.append({"source": f"Transcript/{source.name}", "message": msg})
+            skipped_items.append({
+                "type": "youtube",
+                "source": source.name,
+                "title": f"(IP-blocked: {video_id})",
+                "url": f"https://www.youtube.com/watch?v={video_id}",
+                "reason": "YouTube IP block — transcript unavailable after retries",
+                "action": "Queued for automatic retry on next run. Refresh cookies.txt to resolve sooner.",
+            })
+            mark_ip_blocked(state, video_id, f"(IP-blocked: {video_id})",
+                            f"https://www.youtube.com/watch?v={video_id}", date_str)
+            continue
         except Exception as e:
             msg = f"Failed to fetch {source.name}: {e}"
             logger.error(msg)
@@ -117,34 +280,9 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 logger.info(f"  [DRY RUN] Would process: {video.title}")
                 continue
 
-            if not video.transcript:
-                msg = f"No transcript available for '{video.title}' — skipping"
-                logger.warning(msg)
-                errors.append({
-                    "source": f"Transcript/{video.channel_name}",
-                    "message": msg,
-                })
-                skipped_items.append({
-                    "type": "youtube",
-                    "source": video.channel_name,
-                    "title": video.title,
-                    "url": video.url,
-                    "reason": "YouTube IP block — transcript unavailable",
-                    "action": "Refresh cookies.txt from a logged-in browser session, then re-run.",
-                })
-                continue
-
             try:
-                summary = summarize(
-                    client=gemini_client,
-                    model=config.settings.gemini_model,
-                    title=video.title,
-                    channel_name=video.channel_name,
-                    transcript=video.transcript,
-                    duration_seconds=video.duration_seconds,
-                    language=video.language,
-                    transcript_segments=video.transcript_segments,
-                )
+                _process_video(video)
+                processed_video_ids.add(video.video_id)
             except QuotaExhaustedError as e:
                 logger.error("Daily Gemini quota exhausted — saving progress and stopping early")
                 errors.append({"source": "Gemini/QuotaExhausted", "message": str(e)})
@@ -161,43 +299,6 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                     errors, skipped_items, output_dir, date_str, config,
                 )
                 return
-            except Exception as e:
-                error_str = str(e).lower()
-                if "401" in str(e) or "403" in str(e) or "api_key_invalid" in error_str or "permission_denied" in error_str:
-                    logger.error(f"UNRECOVERABLE: Gemini auth failed — check GEMINI_API_KEY: {e}")
-                    errors.append({"source": "Gemini/AuthError", "message": str(e)})
-                    generate_error_report(errors, skipped_items, output_dir, date_str)
-                    sys.exit(1)
-                msg = f"Summarization failed for '{video.title}': {e}"
-                logger.error(msg)
-                errors.append({"source": f"Gemini/{video.channel_name}", "message": msg})
-                skipped_items.append({
-                    "type": "youtube",
-                    "source": video.channel_name,
-                    "title": video.title,
-                    "url": video.url,
-                    "reason": f"Gemini summarization error: {e}",
-                    "action": "Transient API error — will retry on next run.",
-                })
-                continue
-
-            try:
-                paths = generate_summary_files(
-                    video=video,
-                    summary=summary,
-                    output_dir=output_dir,
-                    date_str=date_str,
-                )
-            except Exception as e:
-                msg = f"File generation failed for '{video.title}': {e}"
-                logger.error(msg)
-                errors.append({"source": f"Generator/{video.channel_name}", "message": msg})
-                digest_entries.append({"video": video, "paths": None, "error": str(e)})
-                continue
-
-            digest_entries.append({"video": video, "paths": paths, "error": None})
-            mark_youtube_processed(state, video.video_id, date_str)
-            processed_video_ids.add(video.video_id)
 
     # -----------------------------------------------------------------------
     # Podcast pipeline

@@ -12,6 +12,7 @@ import pytest
 from src.config import YouTubeSource
 from src.fetchers.youtube import (
     VideoInfo,
+    IpBlockedError,
     fetch_new_videos,
     _get_channel_entries,
     _get_transcript,
@@ -202,19 +203,17 @@ class TestGetTranscript:
         assert text is None
         assert segments == ()
 
-    def test_ip_blocked_retries_then_returns_none(self):
-        """IpBlocked should retry _IP_BLOCK_RETRIES times then return None."""
+    def test_ip_blocked_retries_then_raises(self):
+        """IpBlocked should retry _IP_BLOCK_RETRIES times then raise IpBlockedError."""
         from youtube_transcript_api._errors import IpBlocked
+        import src.fetchers.youtube as yt_mod
         mock_yta = self._mock_yta(fetch_side_effect=IpBlocked("abc123"))
 
         with patch("src.fetchers.youtube._make_yta", return_value=mock_yta), \
-             patch("src.fetchers.youtube.time.sleep"):
-            text, segments = _get_transcript("abc123")
+             patch("src.fetchers.youtube.time.sleep"), \
+             pytest.raises(IpBlockedError):
+            _get_transcript("abc123")
 
-        assert text is None
-        assert segments == ()
-        # Should have retried _IP_BLOCK_RETRIES times
-        import src.fetchers.youtube as yt_mod
         assert mock_yta.fetch.call_count == yt_mod._IP_BLOCK_RETRIES
 
     def test_ip_blocked_succeeds_on_retry(self):

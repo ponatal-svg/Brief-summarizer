@@ -23,6 +23,14 @@ from youtube_transcript_api._errors import (
 )
 
 
+class IpBlockedError(Exception):
+    """Raised when YouTube blocks transcript access after all retries are exhausted.
+
+    Distinct from returning None so callers can record the video in ip_blocked
+    state and retry it on the next run, regardless of lookback window age.
+    """
+
+
 def _make_yta() -> YouTubeTranscriptApi:
     """Create a YouTubeTranscriptApi instance, loading cookies.txt if present.
 
@@ -266,7 +274,7 @@ def _get_transcript(video_id: str, language: str = "en") -> tuple:
                 f"  YouTube IP block persists after {_IP_BLOCK_RETRIES} attempts — "
                 f"refresh cookies.txt to restore access"
             )
-            return None, ()
+            raise IpBlockedError(video_id)
         except (TranscriptsDisabled, VideoUnavailable):
             logger.info(f"  No transcript available for {video_id}")
             return None, ()

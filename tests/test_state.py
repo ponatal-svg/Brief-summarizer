@@ -12,9 +12,14 @@ from src.state import (
     get_processed_ids,
     get_processed_podcast_ids,
     get_rss_cache,
+    get_ip_blocked,
     mark_youtube_processed,
     mark_podcast_processed,
+    mark_ip_blocked,
+    promote_ip_blocked,
+    expire_ip_blocked,
     update_rss_cache,
+    _IP_BLOCKED_TTL_DAYS,
 )
 
 
@@ -167,3 +172,65 @@ class TestUpdateRssCache:
         state = {"rss_cache": {"old_key": "old_val"}}
         update_rss_cache(state, {"new_key": "new_val"})
         assert state["rss_cache"] == {"new_key": "new_val"}
+
+
+class TestIpBlocked:
+    def test_mark_and_get(self):
+        state = {}
+        mark_ip_blocked(state, "vid1", "Test Title", "https://yt.com/v=vid1", "2026-02-23")
+        blocked = get_ip_blocked(state)
+        assert "vid1" in blocked
+        assert blocked["vid1"]["title"] == "Test Title"
+        assert blocked["vid1"]["date"] == "2026-02-23"
+
+    def test_get_returns_copy(self):
+        """get_ip_blocked returns a shallow copy — adding/removing keys doesn't affect state."""
+        state = {}
+        mark_ip_blocked(state, "vid1", "T", "u", "2026-02-23")
+        blocked = get_ip_blocked(state)
+        blocked["new_key"] = "injected"
+        assert "new_key" not in state.get("ip_blocked", {})
+
+    def test_mark_overwrites_existing(self):
+        state = {}
+        mark_ip_blocked(state, "vid1", "Old", "u", "2026-02-20")
+        mark_ip_blocked(state, "vid1", "New", "u", "2026-02-23")
+        assert get_ip_blocked(state)["vid1"]["title"] == "New"
+
+    def test_promote_moves_to_youtube_and_removes_from_blocked(self):
+        state = {}
+        mark_ip_blocked(state, "vid1", "T", "u", "2026-02-23")
+        promote_ip_blocked(state, "vid1", "2026-02-23")
+        assert "vid1" not in get_ip_blocked(state)
+        assert "vid1" in get_processed_ids(state)
+
+    def test_promote_noop_if_not_blocked(self):
+        state = {}
+        promote_ip_blocked(state, "vid_missing", "2026-02-23")  # should not raise
+        assert "vid_missing" in get_processed_ids(state)
+
+    def test_expire_removes_old_entries(self):
+        from datetime import datetime, timedelta, timezone
+        old_date = (datetime.now(timezone.utc) - timedelta(days=_IP_BLOCKED_TTL_DAYS + 1)).strftime("%Y-%m-%d")
+        state = {}
+        mark_ip_blocked(state, "old_vid", "Old", "u", old_date)
+        expired = expire_ip_blocked(state)
+        assert "old_vid" in expired
+        assert "old_vid" not in get_ip_blocked(state)
+
+    def test_expire_keeps_recent_entries(self):
+        state = {}
+        mark_ip_blocked(state, "new_vid", "New", "u", "2026-02-23")
+        expired = expire_ip_blocked(state)
+        assert "new_vid" not in expired
+        assert "new_vid" in get_ip_blocked(state)
+
+    def test_expire_removes_malformed_date_entries(self):
+        state = {"ip_blocked": {"bad_vid": {"date": "not-a-date", "title": "X", "url": "u"}}}
+        expired = expire_ip_blocked(state)
+        assert "bad_vid" in expired
+
+    def test_empty_state_no_error(self):
+        state = {}
+        assert get_ip_blocked(state) == {}
+        assert expire_ip_blocked(state) == []

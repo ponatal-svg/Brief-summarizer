@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 
 from src.config import Config, Category, YouTubeSource, PodcastShow, Settings
-from src.fetchers.youtube import VideoInfo
+from src.fetchers.youtube import VideoInfo, IpBlockedError
 from src.fetchers.podcast import EpisodeInfo, RSSLookupError, TranscriptionError
 from src.main import run, _save_and_generate
 from src.summarizer import QuotaExhaustedError
@@ -234,6 +234,33 @@ class TestYouTubePipeline:
         error_call_args = mock_errors.call_args[0]
         errors = error_call_args[0]
         assert any("model error" in e["message"] for e in errors)
+
+
+    def test_ip_blocked_error_recorded_in_state(self, tmp_path, config):
+        """When fetch_new_videos raises IpBlockedError, video is recorded in ip_blocked state."""
+        with patch("src.main.load_config", return_value=config):
+            with patch("src.main.create_client", return_value=MagicMock()):
+                with patch("src.main.fetch_new_videos", side_effect=IpBlockedError("vid_blocked")):
+                    with patch("src.main.fetch_new_episodes", return_value=[]):
+                        with patch("src.main.generate_daily_digest"):
+                            with patch("src.main.generate_podcast_daily_digest"):
+                                with patch("src.main.generate_error_report"):
+                                    with patch("src.main.generate_viewer"):
+                                        with patch("src.main.save_state") as mock_save:
+                                            with patch("src.main.cleanup_old_content", return_value=[]):
+                                                with patch("src.main.cleanup_state"):
+                                                    with pytest.raises(SystemExit):
+                                                        run(
+                                                            config_path=tmp_path / "config.yaml",
+                                                            output_dir=tmp_path / "output",
+                                                            state_path=tmp_path / "state.json",
+                                                        )
+
+        # State should have been saved with the ip_blocked entry
+        assert mock_save.called
+        saved_state = mock_save.call_args[0][1]  # second positional arg is the state dict
+        assert "ip_blocked" in saved_state
+        assert "vid_blocked" in saved_state["ip_blocked"]
 
 
 # ---------------------------------------------------------------------------

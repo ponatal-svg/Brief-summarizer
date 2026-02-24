@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,10 @@ logger = logging.getLogger(__name__)
 _KEY_YOUTUBE = "youtube"
 _KEY_PODCASTS = "podcasts"
 _KEY_RSS_CACHE = "rss_cache"
+_KEY_IP_BLOCKED = "ip_blocked"
+
+# Videos stuck in ip_blocked longer than this are dropped (likely deleted / too old)
+_IP_BLOCKED_TTL_DAYS = 7
 
 
 def load_state(state_path: Path) -> dict:
@@ -89,3 +94,43 @@ def mark_podcast_processed(state: dict, episode_id: str, date_str: str) -> None:
 def update_rss_cache(state: dict, rss_cache: dict) -> None:
     """Persist RSS feed URL cache back into state."""
     state[_KEY_RSS_CACHE] = rss_cache
+
+
+# ---------------------------------------------------------------------------
+# IP-blocked video tracking
+# ---------------------------------------------------------------------------
+
+def get_ip_blocked(state: dict) -> dict:
+    """Return the ip_blocked dict: {video_id: {"date": YYYY-MM-DD, "title": str, "url": str}}."""
+    return dict(state.get(_KEY_IP_BLOCKED, {}))
+
+
+def mark_ip_blocked(state: dict, video_id: str, title: str, url: str, date_str: str) -> None:
+    """Record a video as IP-blocked so it is retried on the next run."""
+    if _KEY_IP_BLOCKED not in state:
+        state[_KEY_IP_BLOCKED] = {}
+    state[_KEY_IP_BLOCKED][video_id] = {"date": date_str, "title": title, "url": url}
+
+
+def promote_ip_blocked(state: dict, video_id: str, date_str: str) -> None:
+    """Move a video from ip_blocked to processed (transcript successfully fetched)."""
+    state.get(_KEY_IP_BLOCKED, {}).pop(video_id, None)
+    mark_youtube_processed(state, video_id, date_str)
+
+
+def expire_ip_blocked(state: dict) -> list[str]:
+    """Remove entries older than _IP_BLOCKED_TTL_DAYS. Returns list of expired video_ids."""
+    blocked = state.get(_KEY_IP_BLOCKED, {})
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_IP_BLOCKED_TTL_DAYS)
+    expired = []
+    for video_id, info in list(blocked.items()):
+        try:
+            recorded = datetime.strptime(info["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except (KeyError, ValueError):
+            expired.append(video_id)
+            continue
+        if recorded < cutoff:
+            expired.append(video_id)
+    for video_id in expired:
+        blocked.pop(video_id, None)
+    return expired
