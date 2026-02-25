@@ -538,7 +538,7 @@ async function init() {
   } catch(e) { DIGEST_INDEX = []; }
 
   try {
-    var cntResp = await fetch('digest-counts.json');
+    var cntResp = await fetch('podcast-counts.json');
     DIGEST_COUNTS = cntResp.ok ? await cntResp.json() : {};
   } catch(e) { DIGEST_COUNTS = {}; }
 

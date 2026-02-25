@@ -1013,6 +1013,7 @@ PODCASTS_HTML = VIEWER_HTML \
     .replace("Morning Brief<span>/ youtube</span>", "Morning Brief<span>/ podcasts</span>") \
     .replace("fetch('daily/'", "fetch('podcast-daily/'") \
     .replace("fetch('digest-index.json'", "fetch('podcast-index.json'") \
+    .replace("fetch('digest-counts.json'", "fetch('podcast-counts.json'") \
     .replace("('summaries/' + currentDate", "('podcast-summaries/' + currentDate") \
     .replace("No digests available yet. Run the pipeline first.", "No podcast episodes available yet. Run the pipeline first.")
 
@@ -1379,6 +1380,23 @@ def generate_viewer(config: Config, output_dir: Path) -> None:
 
     podcast_index_path = output_dir / "podcast-index.json"
     podcast_index_path.write_text(json.dumps(podcast_dates, indent=2), encoding="utf-8")
+
+    # Write podcast-counts.json ({date: episode_count}) for the podcast viewer
+    podcast_counts: dict = {}
+    if podcast_daily_dir.exists():
+        for f in podcast_daily_dir.glob("*.md"):
+            if len(f.stem) != 10:
+                continue
+            try:
+                text = f.read_text(encoding="utf-8")
+                podcast_counts[f.stem] = sum(
+                    1 for line in text.splitlines() if line.startswith("### ")
+                )
+            except OSError:
+                podcast_counts[f.stem] = 0
+
+    podcast_counts_path = output_dir / "podcast-counts.json"
+    podcast_counts_path.write_text(json.dumps(podcast_counts, indent=2), encoding="utf-8")
 
     # Write podcasts.html (podcast detail page)
     podcasts_path = output_dir / "podcasts.html"
