@@ -97,10 +97,12 @@ def cleanup_state(state_path: Path, max_age_days: int) -> None:
                 cleaned[section] = entries
                 continue
             cleaned_section = {}
-            for entry_id, date_str in entries.items():
+            for entry_id, date_val in entries.items():
+                # date_val may be a plain string (legacy) or a dict {"date": ..., ...}
+                date_str = date_val["date"] if isinstance(date_val, dict) else date_val
                 date = _parse_date_from_name(date_str)
                 if date and date >= cutoff:
-                    cleaned_section[entry_id] = date_str
+                    cleaned_section[entry_id] = date_val
                 else:
                     removed_count += 1
             cleaned[section] = cleaned_section
