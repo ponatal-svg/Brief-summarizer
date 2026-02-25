@@ -48,6 +48,7 @@ jobs:
 
   deploy:
     needs: summarize
+    if: always()   # deploy even if summarize fails — Pages should reflect whatever was committed
     runs-on: ubuntu-latest
     environment:
       name: github-pages
