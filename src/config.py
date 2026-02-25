@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -158,9 +158,7 @@ def _parse_podcast_shows(raw: dict) -> list[PodcastShow]:
     if not isinstance(raw, dict):
         raise ConfigError("'sources' must be a mapping")
 
-    podcasts_raw = raw.get("podcasts", [])
-    if podcasts_raw is None:
-        podcasts_raw = []
+    podcasts_raw = raw.get("podcasts") or []  # None or missing both become []
     if not isinstance(podcasts_raw, list):
         raise ConfigError("'sources.podcasts' must be a list")
 

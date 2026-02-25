@@ -17,7 +17,7 @@ except ImportError:
 
 from src.cleanup import cleanup_old_content, cleanup_state
 from src.config import load_config, ConfigError
-from src.fetchers.youtube import fetch_new_videos, IpBlockedError
+from src.fetchers.youtube import fetch_new_videos, IpBlockedError, VideoInfo, _get_transcript
 from src.fetchers.podcast import (
     fetch_new_episodes,
     download_and_transcribe,
@@ -220,7 +220,6 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
 
     # Retry previously IP-blocked videos first (they bypass the lookback window)
     if ip_blocked_videos and not dry_run:
-        from src.fetchers.youtube import _get_transcript, VideoInfo as _VideoInfo
         logger.info(f"Retrying {len(ip_blocked_videos)} previously IP-blocked video(s)...")
         for video_id, info in list(ip_blocked_videos.items()):
             title = info.get("title", video_id)
@@ -244,7 +243,7 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 continue
 
             # Transcript recovered — build a minimal VideoInfo and process it
-            video = _VideoInfo(
+            video = VideoInfo(
                 video_id=video_id,
                 title=title,
                 url=url,
@@ -477,9 +476,11 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
         f"{len(errors)} errors, {len(skipped_items)} skipped"
     )
 
-    # Exit with non-zero code if anything was skipped/errored — lets cron jobs
-    # detect partial failures and trigger alerts (e.g. MAILTO in crontab).
-    if errors or skipped_items:
+    # Exit with non-zero code if there were processing errors — lets the GitHub
+    # Action detect failures and trigger the "Report unrecoverable failure" step.
+    # skipped_items alone (e.g. IP block, no transcript) don't warrant a failure
+    # exit since they are handled gracefully and queued for retry.
+    if errors:
         sys.exit(1)
 
 

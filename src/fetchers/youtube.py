@@ -22,6 +22,10 @@ from youtube_transcript_api._errors import (
     IpBlocked,
 )
 
+from src.config import YouTubeSource
+
+logger = logging.getLogger(__name__)
+
 
 class IpBlockedError(Exception):
     """Raised when YouTube blocks transcript access after all retries are exhausted.
@@ -48,13 +52,9 @@ def _make_yta() -> YouTubeTranscriptApi:
             session = requests.Session()
             session.cookies = jar
             return YouTubeTranscriptApi(http_client=session)
-        except Exception:
-            pass  # Fall through to cookieless instance
+        except Exception as e:
+            logger.debug(f"Failed to load cookies.txt, proceeding without: {e}")
     return YouTubeTranscriptApi()
-
-from src.config import YouTubeSource
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -108,23 +108,9 @@ def fetch_new_videos(
         if upload_date and not _is_within_lookback(upload_date, lookback_hours):
             continue
 
-        transcript, segments = _get_transcript(video_id, language=source.language)
-        time.sleep(5)  # pace caption API calls to avoid YouTube 429 rate-limiting
-
-        video = VideoInfo(
-            video_id=video_id,
-            title=entry.get("title", "Untitled"),
-            url=f"https://www.youtube.com/watch?v={video_id}",
-            channel_name=source.name,
-            category=source.category,
-            upload_date=upload_date or datetime.now(timezone.utc),
-            duration_seconds=entry.get("duration") or 0,
-            transcript=transcript,
-            language=source.language,
-            transcript_segments=segments,
-        )
+        video = _build_video_info(entry, source, upload_date)
         videos.append(video)
-        logger.info(f"  Found: {video.title} (transcript: {'yes' if transcript else 'no'})")
+        logger.info(f"  Found: {video.title} (transcript: {'yes' if video.transcript else 'no'})")
 
     # Guarantee at least one video per channel: if all were filtered out
     # (too old or already processed), force-include the latest entry.
@@ -136,25 +122,34 @@ def fetch_new_videos(
             real_date = _get_video_upload_date(video_id)
             if real_date:
                 upload_date = real_date
-            transcript, segments = _get_transcript(video_id, language=source.language)
-            time.sleep(5)  # pace caption API calls to avoid YouTube 429 rate-limiting
-            video = VideoInfo(
-                video_id=video_id,
-                title=latest.get("title", "Untitled"),
-                url=f"https://www.youtube.com/watch?v={video_id}",
-                channel_name=source.name,
-                category=source.category,
-                upload_date=upload_date or datetime.now(timezone.utc),
-                duration_seconds=latest.get("duration") or 0,
-                transcript=transcript,
-                language=source.language,
-                transcript_segments=segments,
-            )
+            video = _build_video_info(latest, source, upload_date)
             videos.append(video)
             logger.info(f"  Fallback: {video.title} (outside lookback, included as latest)")
 
     logger.info(f"  {len(videos)} new video(s) from {source.name}")
     return videos
+
+
+_TRANSCRIPT_API_PACE_SECONDS = 5  # pause between caption API calls to avoid YouTube 429s
+
+
+def _build_video_info(entry: dict, source: YouTubeSource, upload_date) -> "VideoInfo":
+    """Fetch transcript and build a VideoInfo from a yt-dlp entry dict."""
+    video_id = entry["id"]
+    transcript, segments = _get_transcript(video_id, language=source.language)
+    time.sleep(_TRANSCRIPT_API_PACE_SECONDS)
+    return VideoInfo(
+        video_id=video_id,
+        title=entry.get("title", "Untitled"),
+        url=f"https://www.youtube.com/watch?v={video_id}",
+        channel_name=source.name,
+        category=source.category,
+        upload_date=upload_date or datetime.now(timezone.utc),
+        duration_seconds=entry.get("duration") or 0,
+        transcript=transcript,
+        language=source.language,
+        transcript_segments=segments,
+    )
 
 
 _CHANNEL_FETCH_RETRIES = 3

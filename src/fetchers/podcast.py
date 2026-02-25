@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import subprocess
@@ -21,6 +22,7 @@ from urllib.error import URLError, HTTPError
 from google import genai
 
 from src.config import PodcastShow
+from src.summarizer import LANGUAGE_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +236,6 @@ def _lookup_itunes(show_name: str) -> Optional[str]:
                 headers={"User-Agent": "MorningBrief/1.0 (podcast RSS resolver)"},
             )
             with urllib.request.urlopen(req, timeout=15) as resp:
-                import json
                 data = json.loads(resp.read().decode("utf-8"))
                 results = data.get("results", [])
                 if results:
@@ -585,14 +586,6 @@ Additional requirements:
 Episode title: {title}
 Show: {show_name}
 """
-
-# Language code to name mapping (same as summarizer.py)
-LANGUAGE_NAMES = {
-    "en": "English", "es": "Spanish", "he": "Hebrew", "ar": "Arabic",
-    "fr": "French", "de": "German", "pt": "Portuguese", "it": "Italian",
-    "ja": "Japanese", "ko": "Korean", "zh": "Chinese", "ru": "Russian",
-}
-
 
 def _get_language_name(code: str) -> str:
     return LANGUAGE_NAMES.get(code, code)

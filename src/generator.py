@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from src.fetchers.youtube import VideoInfo
 from src.fetchers.podcast import EpisodeInfo
@@ -270,7 +270,7 @@ def _parse_existing_podcast_digest(digest_path: Path, output_dir: Path) -> list:
                 current["listen_url"] = listen_match.group(1)
         elif current and line.startswith("<!-- episode_id:"):
             # Stable ID embedded by the generator — use this for deduplication
-            id_match = re.search(r'<!-- episode_id: ([a-f0-9]+) -->', line)
+            id_match = re.search(r'<!-- episode_id: ([a-f0-9]{16}) -->', line)
             if id_match:
                 current["episode_id"] = id_match.group(1)
         elif current and line.startswith("[Summary]"):
@@ -286,9 +286,6 @@ def _parse_existing_podcast_digest(digest_path: Path, output_dir: Path) -> list:
 
 def _stub_podcast_entry(existing: dict) -> dict:
     """Convert a parsed existing podcast digest entry back into a generator entry dict."""
-    from src.fetchers.podcast import EpisodeInfo
-    from datetime import datetime, timezone
-
     try:
         pub = datetime.strptime(existing["pub_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except (ValueError, KeyError):
@@ -417,9 +414,6 @@ def generate_daily_digest(
 
 def _parse_existing_digest(digest_path: Path, output_dir: Path) -> list:
     """Parse an existing daily digest to extract entry stubs for merging."""
-    from src.fetchers.youtube import VideoInfo
-    from datetime import datetime, timezone
-
     entries = []
     try:
         text = digest_path.read_text(encoding="utf-8")
@@ -461,9 +455,6 @@ def _parse_existing_digest(digest_path: Path, output_dir: Path) -> list:
 
 def _stub_entry(existing: dict) -> dict:
     """Convert a parsed existing digest entry back into a generator entry dict."""
-    from src.fetchers.youtube import VideoInfo
-    from datetime import datetime, timezone
-
     try:
         upload_date = datetime.strptime(existing["pub_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except (ValueError, KeyError):
