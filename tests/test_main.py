@@ -416,3 +416,408 @@ class TestConfigErrors:
                         output_dir=tmp_path / "output",
                         state_path=tmp_path / "state.json",
                     )
+
+
+# ---------------------------------------------------------------------------
+# Tests: dry-run empty table path
+# ---------------------------------------------------------------------------
+
+class TestDryRunEmptyTable:
+    def test_dry_run_with_no_pending_items_prints_nothing_to_process(self, tmp_path, config, capsys):
+        """When no new content exists, dry-run prints the 'nothing to process' message."""
+        with patch("src.main.load_config", return_value=config):
+            with patch("src.main.fetch_new_videos", return_value=[]):
+                with patch("src.main.fetch_new_episodes", return_value=[]):
+                    run(
+                        config_path=tmp_path / "config.yaml",
+                        output_dir=tmp_path / "output",
+                        state_path=tmp_path / "state.json",
+                        dry_run=True,
+                    )
+
+        out = capsys.readouterr().out
+        assert "nothing to process" in out.lower()
+
+
+# ---------------------------------------------------------------------------
+# Tests: auth error paths (Gemini 401/403 in YouTube and Podcast)
+# ---------------------------------------------------------------------------
+
+def _std_patches(tmp_path, config, videos=None, episodes=None):
+    """Return a context manager stack for a standard run with controllable mocks."""
+    import contextlib
+    videos = videos or []
+    episodes = episodes or []
+
+    @contextlib.contextmanager
+    def _ctx():
+        with patch("src.main.load_config", return_value=config), \
+             patch("src.main.create_client", return_value=MagicMock()), \
+             patch("src.main.fetch_new_videos", return_value=videos), \
+             patch("src.main.fetch_new_episodes", return_value=episodes), \
+             patch("src.main.generate_daily_digest"), \
+             patch("src.main.generate_podcast_daily_digest"), \
+             patch("src.main.generate_error_report"), \
+             patch("src.main.generate_viewer"), \
+             patch("src.main.save_state"), \
+             patch("src.main.cleanup_old_content", return_value=[]), \
+             patch("src.main.cleanup_state"):
+            yield
+
+    return _ctx()
+
+
+class TestAuthErrors:
+    def test_youtube_auth_error_exits(self, tmp_path, config, sample_video):
+        """Gemini 401 during YouTube summarization causes immediate sys.exit(1)."""
+        with _std_patches(tmp_path, config, videos=[sample_video]):
+            with patch("src.main.summarize", side_effect=RuntimeError("401 Unauthorized")):
+                with pytest.raises(SystemExit):
+                    run(
+                        config_path=tmp_path / "config.yaml",
+                        output_dir=tmp_path / "output",
+                        state_path=tmp_path / "state.json",
+                    )
+
+    def test_podcast_auth_error_exits(self, tmp_path, config, sample_episode):
+        """Gemini 403 during podcast transcription causes immediate sys.exit(1)."""
+        with _std_patches(tmp_path, config, episodes=[sample_episode]):
+            with patch("src.main.download_and_transcribe",
+                       side_effect=RuntimeError("403 permission_denied")):
+                with pytest.raises(SystemExit):
+                    run(
+                        config_path=tmp_path / "config.yaml",
+                        output_dir=tmp_path / "output",
+                        state_path=tmp_path / "state.json",
+                    )
+
+
+# ---------------------------------------------------------------------------
+# Tests: file-write failure path
+# ---------------------------------------------------------------------------
+
+class TestFileWriteFailure:
+    def test_summary_file_write_failure_continues(self, tmp_path, config, sample_video):
+        """If generate_summary_files raises, the video is skipped but run continues."""
+        with _std_patches(tmp_path, config, videos=[sample_video]):
+            with patch("src.main.summarize", return_value="summary text"):
+                with patch("src.main.generate_summary_files",
+                           side_effect=OSError("disk full")):
+                    with pytest.raises(SystemExit):
+                        run(
+                            config_path=tmp_path / "config.yaml",
+                            output_dir=tmp_path / "output",
+                            state_path=tmp_path / "state.json",
+                        )
+
+    def test_podcast_file_write_failure_entry_recorded_with_error(
+        self, tmp_path, config, sample_episode
+    ):
+        """If generate_podcast_summary_files raises, entry is added with error=str."""
+        with patch("src.main.load_config", return_value=config), \
+             patch("src.main.create_client", return_value=MagicMock()), \
+             patch("src.main.fetch_new_videos", return_value=[]), \
+             patch("src.main.fetch_new_episodes", return_value=[sample_episode]), \
+             patch("src.main.download_and_transcribe", return_value="summary"), \
+             patch("src.main.generate_podcast_summary_files",
+                   side_effect=OSError("no space left")), \
+             patch("src.main.generate_daily_digest"), \
+             patch("src.main.generate_podcast_daily_digest") as mock_pd, \
+             patch("src.main.generate_error_report"), \
+             patch("src.main.generate_viewer"), \
+             patch("src.main.save_state"), \
+             patch("src.main.cleanup_old_content", return_value=[]), \
+             patch("src.main.cleanup_state"):
+            with pytest.raises(SystemExit):
+                run(
+                    config_path=tmp_path / "config.yaml",
+                    output_dir=tmp_path / "output",
+                    state_path=tmp_path / "state.json",
+                )
+
+        entries = mock_pd.call_args[0][0]
+        assert len(entries) == 1
+        assert entries[0]["error"] == "no space left"
+        assert entries[0]["paths"] is None
+
+
+# ---------------------------------------------------------------------------
+# Tests: IP-blocked retry queue
+# ---------------------------------------------------------------------------
+
+class TestIpBlockedRetry:
+    def test_blocked_video_retried_and_promoted_on_success(
+        self, tmp_path, config, sample_video
+    ):
+        """A video in ip_blocked state is retried; on success it moves to youtube state."""
+        state_with_blocked = {
+            "youtube": {},
+            "podcasts": {},
+            "rss_cache": {},
+            "ip_blocked": {
+                "vid_blocked": {
+                    "date": "2026-02-20",
+                    "title": "Blocked Video",
+                    "url": "https://youtube.com/watch?v=vid_blocked",
+                    "channel": "Test Channel",
+                }
+            },
+        }
+
+        with patch("src.main.load_config", return_value=config), \
+             patch("src.main.load_state", return_value=state_with_blocked), \
+             patch("src.main.create_client", return_value=MagicMock()), \
+             patch("src.main.fetch_new_videos", return_value=[]), \
+             patch("src.main.fetch_new_episodes", return_value=[]), \
+             patch("src.main._get_transcript",
+                   return_value=("recovered transcript", ())), \
+             patch("src.main.summarize", return_value="summary"), \
+             patch("src.main.generate_summary_files",
+                   return_value={"summary_path": tmp_path / "s.md", "slug": "s"}), \
+             patch("src.main.generate_daily_digest"), \
+             patch("src.main.generate_podcast_daily_digest"), \
+             patch("src.main.generate_error_report"), \
+             patch("src.main.generate_viewer"), \
+             patch("src.main.save_state") as mock_save, \
+             patch("src.main.cleanup_old_content", return_value=[]), \
+             patch("src.main.cleanup_state"):
+            run(
+                config_path=tmp_path / "config.yaml",
+                output_dir=tmp_path / "output",
+                state_path=tmp_path / "state.json",
+            )
+
+        saved = mock_save.call_args[0][1]
+        # Video should have been promoted to youtube state
+        assert "vid_blocked" in saved.get("youtube", {})
+        # And removed from ip_blocked
+        assert "vid_blocked" not in saved.get("ip_blocked", {})
+
+    def test_still_blocked_video_stays_in_ip_blocked(self, tmp_path, config):
+        """A video that's still IP-blocked on retry stays in ip_blocked state."""
+        state_with_blocked = {
+            "youtube": {},
+            "podcasts": {},
+            "rss_cache": {},
+            "ip_blocked": {
+                "vid_still_blocked": {
+                    "date": "2026-02-20",
+                    "title": "Still Blocked",
+                    "url": "https://youtube.com/watch?v=vid_still_blocked",
+                    "channel": "Test Channel",
+                }
+            },
+        }
+
+        with patch("src.main.load_config", return_value=config), \
+             patch("src.main.load_state", return_value=state_with_blocked), \
+             patch("src.main.create_client", return_value=MagicMock()), \
+             patch("src.main.fetch_new_videos", return_value=[]), \
+             patch("src.main.fetch_new_episodes", return_value=[]), \
+             patch("src.main._get_transcript",
+                   side_effect=IpBlockedError("vid_still_blocked")), \
+             patch("src.main.generate_daily_digest"), \
+             patch("src.main.generate_podcast_daily_digest"), \
+             patch("src.main.generate_error_report"), \
+             patch("src.main.generate_viewer"), \
+             patch("src.main.save_state") as mock_save, \
+             patch("src.main.cleanup_old_content", return_value=[]), \
+             patch("src.main.cleanup_state"):
+            run(
+                config_path=tmp_path / "config.yaml",
+                output_dir=tmp_path / "output",
+                state_path=tmp_path / "state.json",
+            )
+
+        saved = mock_save.call_args[0][1]
+        # Should still be in ip_blocked, NOT promoted
+        assert "vid_still_blocked" in saved.get("ip_blocked", {})
+        assert "vid_still_blocked" not in saved.get("youtube", {})
+
+    def test_expired_ip_blocked_entries_removed(self, tmp_path, config):
+        """ip_blocked entries older than TTL are expired at run start."""
+        state_with_old_blocked = {
+            "youtube": {},
+            "podcasts": {},
+            "rss_cache": {},
+            "ip_blocked": {
+                "old_vid": {
+                    "date": "2020-01-01",  # way past TTL
+                    "title": "Old Blocked",
+                    "url": "https://youtube.com/watch?v=old_vid",
+                    "channel": "Test Channel",
+                }
+            },
+        }
+
+        with patch("src.main.load_config", return_value=config), \
+             patch("src.main.load_state", return_value=state_with_old_blocked), \
+             patch("src.main.create_client", return_value=MagicMock()), \
+             patch("src.main.fetch_new_videos", return_value=[]), \
+             patch("src.main.fetch_new_episodes", return_value=[]), \
+             patch("src.main.generate_daily_digest"), \
+             patch("src.main.generate_podcast_daily_digest"), \
+             patch("src.main.generate_error_report"), \
+             patch("src.main.generate_viewer"), \
+             patch("src.main.save_state") as mock_save, \
+             patch("src.main.cleanup_old_content", return_value=[]), \
+             patch("src.main.cleanup_state"):
+            run(
+                config_path=tmp_path / "config.yaml",
+                output_dir=tmp_path / "output",
+                state_path=tmp_path / "state.json",
+            )
+
+        saved = mock_save.call_args[0][1]
+        assert "old_vid" not in saved.get("ip_blocked", {})
+
+
+# ---------------------------------------------------------------------------
+# Tests: notify_email path
+# ---------------------------------------------------------------------------
+
+class TestNotifyEmail:
+    def test_notification_sent_when_email_configured(self, tmp_path, sample_video):
+        config_with_email = Config(
+            categories=[Category(name="AI", color="#4A90D9")],
+            youtube_sources=[
+                YouTubeSource(channel_url="https://youtube.com/@test",
+                              name="Test Channel", category="AI"),
+            ],
+            podcast_shows=[],
+            settings=Settings(
+                max_age_days=7, gemini_model="gemini-2.5-flash",
+                max_videos_per_channel=3, lookback_hours=26,
+                max_episodes_per_show=3, min_episodes_per_show=1,
+                max_audio_minutes=60, notify_email="test@example.com",
+            ),
+        )
+        mock_paths = {
+            "summary_path": tmp_path / "s.md",
+            "slug": "s",
+        }
+
+        with patch("src.main.load_config", return_value=config_with_email), \
+             patch("src.main.create_client", return_value=MagicMock()), \
+             patch("src.main.fetch_new_videos", return_value=[sample_video]), \
+             patch("src.main.fetch_new_episodes", return_value=[]), \
+             patch("src.main.summarize", return_value="## Summary"), \
+             patch("src.main.generate_summary_files", return_value=mock_paths), \
+             patch("src.main.generate_daily_digest"), \
+             patch("src.main.generate_podcast_daily_digest"), \
+             patch("src.main.generate_error_report"), \
+             patch("src.main.generate_viewer"), \
+             patch("src.main.save_state"), \
+             patch("src.main.cleanup_old_content", return_value=[]), \
+             patch("src.main.cleanup_state"), \
+             patch("src.main.send_run_notification") as mock_notify:
+            run(
+                config_path=tmp_path / "config.yaml",
+                output_dir=tmp_path / "output",
+                state_path=tmp_path / "state.json",
+            )
+
+        mock_notify.assert_called_once()
+        call_kwargs = mock_notify.call_args[1]
+        assert call_kwargs["to_addr"] == "test@example.com"
+
+    def test_notification_failure_does_not_crash_run(self, tmp_path, config, sample_video):
+        """Email send errors are swallowed — they are non-fatal."""
+        config_with_email = Config(
+            categories=config.categories,
+            youtube_sources=config.youtube_sources,
+            podcast_shows=[],
+            settings=Settings(
+                max_age_days=7, gemini_model="gemini-2.5-flash",
+                max_videos_per_channel=3, lookback_hours=26,
+                max_episodes_per_show=3, min_episodes_per_show=1,
+                max_audio_minutes=60, notify_email="test@example.com",
+            ),
+        )
+        mock_paths = {"summary_path": tmp_path / "s.md", "slug": "s"}
+
+        with patch("src.main.load_config", return_value=config_with_email), \
+             patch("src.main.create_client", return_value=MagicMock()), \
+             patch("src.main.fetch_new_videos", return_value=[sample_video]), \
+             patch("src.main.fetch_new_episodes", return_value=[]), \
+             patch("src.main.summarize", return_value="summary"), \
+             patch("src.main.generate_summary_files", return_value=mock_paths), \
+             patch("src.main.generate_daily_digest"), \
+             patch("src.main.generate_podcast_daily_digest"), \
+             patch("src.main.generate_error_report"), \
+             patch("src.main.generate_viewer"), \
+             patch("src.main.save_state"), \
+             patch("src.main.cleanup_old_content", return_value=[]), \
+             patch("src.main.cleanup_state"), \
+             patch("src.main.send_run_notification",
+                   side_effect=Exception("SMTP error")):
+            # Should NOT raise — email failure is non-fatal
+            run(
+                config_path=tmp_path / "config.yaml",
+                output_dir=tmp_path / "output",
+                state_path=tmp_path / "state.json",
+            )
+
+
+# ---------------------------------------------------------------------------
+# Tests: podcast generic Exception (non-auth, non-quota, non-TranscriptionError)
+# ---------------------------------------------------------------------------
+
+class TestPodcastGenericError:
+    def test_podcast_generic_exception_logged_continues(
+        self, tmp_path, config, sample_episode
+    ):
+        """A generic RuntimeError during download_and_transcribe is caught and logged."""
+        with _std_patches(tmp_path, config, episodes=[sample_episode]):
+            with patch("src.main.download_and_transcribe",
+                       side_effect=RuntimeError("random failure")):
+                with pytest.raises(SystemExit):
+                    run(
+                        config_path=tmp_path / "config.yaml",
+                        output_dir=tmp_path / "output",
+                        state_path=tmp_path / "state.json",
+                    )
+
+    def test_podcast_generic_fetch_exception_logged(self, tmp_path, config):
+        """A generic Exception during fetch_new_episodes is caught and run continues."""
+        with _std_patches(tmp_path, config):
+            with patch("src.main.fetch_new_episodes",
+                       side_effect=RuntimeError("connection reset")):
+                with pytest.raises(SystemExit):
+                    run(
+                        config_path=tmp_path / "config.yaml",
+                        output_dir=tmp_path / "output",
+                        state_path=tmp_path / "state.json",
+                    )
+
+
+# ---------------------------------------------------------------------------
+# Tests: main() CLI entrypoint
+# ---------------------------------------------------------------------------
+
+class TestMainEntrypoint:
+    def test_main_calls_run_with_defaults(self, tmp_path, monkeypatch):
+        """main() parses args and calls run() with correct defaults."""
+        import sys
+        monkeypatch.setattr(sys, "argv", ["src.main"])
+
+        with patch("src.main.run") as mock_run:
+            from src.main import main
+            main()
+
+        mock_run.assert_called_once()
+        kwargs = mock_run.call_args[1]
+        assert kwargs["config_path"] == Path("config.yaml")
+        assert kwargs["output_dir"] == Path("output")
+        assert kwargs["state_path"] == Path("state.json")
+        assert kwargs["dry_run"] is False
+
+    def test_main_dry_run_flag(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(sys, "argv", ["src.main", "--dry-run"])
+
+        with patch("src.main.run") as mock_run:
+            from src.main import main
+            main()
+
+        assert mock_run.call_args[1]["dry_run"] is True

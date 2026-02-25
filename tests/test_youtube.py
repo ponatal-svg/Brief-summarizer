@@ -673,6 +673,87 @@ class TestFetchNewVideosDateFallback:
         assert len(result) == 1
         assert result[0].upload_date == real_date
 
+
+# ---------------------------------------------------------------------------
+# Tests: _make_yta cookie load failure (lines 47-56)
+# ---------------------------------------------------------------------------
+
+class TestMakeYtaCookieFailure:
+    def test_cookie_load_exception_falls_back_to_cookieless(self, tmp_path):
+        """If cookies.txt load raises, _make_yta falls back to plain instance."""
+        from src.fetchers.youtube import _make_yta
+        import http.cookiejar
+
+        cookies_file = tmp_path / "cookies.txt"
+        cookies_file.write_text("not valid cookie format\n")
+
+        with patch("src.fetchers.youtube.Path") as mock_path_cls:
+            mock_parent = MagicMock()
+            mock_parent.__truediv__ = MagicMock(return_value=cookies_file)
+            mock_path_cls.return_value = mock_parent
+
+            with patch.object(http.cookiejar.MozillaCookieJar, "load",
+                               side_effect=http.cookiejar.LoadError("bad format")):
+                with patch("src.fetchers.youtube.YouTubeTranscriptApi") as mock_yta:
+                    _make_yta()
+
+        # Fallback: called with no http_client
+        mock_yta.assert_called_once_with()
+
+
+# ---------------------------------------------------------------------------
+# Tests: yt-dlp non-JSON line in output (lines 214, 217-218)
+# ---------------------------------------------------------------------------
+
+class TestGetChannelEntriesBadJson:
+    def test_non_json_line_is_skipped_with_warning(self):
+        """If yt-dlp emits a non-JSON warning line, it is skipped; valid entries kept."""
+        from src.fetchers.youtube import _get_channel_entries
+        import json as _json
+
+        good_entry = {"id": "vid1", "title": "Good Video", "upload_date": "20260225"}
+        mixed_output = f"WARNING: some yt-dlp warning\n{_json.dumps(good_entry)}\n"
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = mixed_output
+
+        with patch("src.fetchers.youtube.subprocess.run", return_value=mock_result):
+            entries = _get_channel_entries("https://youtube.com/@test", max_videos=3)
+
+        assert len(entries) == 1
+        assert entries[0]["id"] == "vid1"
+
+    def test_empty_lines_ignored(self):
+        """Empty lines in yt-dlp output don't cause errors."""
+        from src.fetchers.youtube import _get_channel_entries
+        import json as _json
+
+        entry = {"id": "vid2", "title": "Test", "upload_date": "20260225"}
+        output_with_blanks = f"\n\n{_json.dumps(entry)}\n\n"
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = output_with_blanks
+
+        with patch("src.fetchers.youtube.subprocess.run", return_value=mock_result):
+            entries = _get_channel_entries("https://youtube.com/@test", max_videos=3)
+
+        assert len(entries) == 1
+
+    def test_all_invalid_json_returns_empty(self):
+        """If all yt-dlp lines are non-JSON, result is empty list."""
+        from src.fetchers.youtube import _get_channel_entries
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "WARNING: line1\nERROR: line2\n"
+
+        with patch("src.fetchers.youtube.subprocess.run", return_value=mock_result):
+            entries = _get_channel_entries("https://youtube.com/@test", max_videos=3)
+
+        assert entries == []
+
     def test_uses_flat_playlist_date_when_real_fetch_fails(self, sample_source, sample_entry):
         """When _get_video_upload_date returns None, should use flat-playlist date."""
         with patch("src.fetchers.youtube._get_channel_entries", return_value=[sample_entry]):

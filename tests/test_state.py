@@ -246,3 +246,51 @@ class TestIpBlocked:
         state = {}
         assert get_ip_blocked(state) == {}
         assert expire_ip_blocked(state) == []
+
+
+# ---------------------------------------------------------------------------
+# Tests: save_state OSError
+# ---------------------------------------------------------------------------
+
+class TestSaveStateErrors:
+    def test_save_state_oserror_raises(self, tmp_path):
+        """save_state re-raises OSError after logging."""
+        from src.state import save_state
+        state_path = tmp_path / "state.json"
+        state = {"youtube": {}, "podcasts": {}}
+
+        # Make the directory read-only so write fails
+        tmp_path.chmod(0o444)
+        try:
+            with pytest.raises(OSError):
+                save_state(state_path, state)
+        finally:
+            tmp_path.chmod(0o755)  # restore for cleanup
+
+
+# ---------------------------------------------------------------------------
+# Tests: get_youtube_entries — legacy plain-string values normalised
+# ---------------------------------------------------------------------------
+
+class TestGetYoutubeEntriesLegacy:
+    def test_plain_date_string_normalised_to_dict(self):
+        from src.state import get_youtube_entries
+        state = {"youtube": {"vid1": "2026-02-01"}}
+        result = get_youtube_entries(state)
+        assert result["vid1"] == {"date": "2026-02-01", "channel": "", "title": ""}
+
+    def test_mixed_legacy_and_rich_format(self):
+        from src.state import get_youtube_entries
+        state = {"youtube": {
+            "vid_old": "2026-02-01",
+            "vid_new": {"date": "2026-02-02", "channel": "Ch", "title": "T"},
+        }}
+        result = get_youtube_entries(state)
+        assert result["vid_old"]["date"] == "2026-02-01"
+        assert result["vid_old"]["channel"] == ""
+        assert result["vid_new"]["channel"] == "Ch"
+
+    def test_empty_youtube_section(self):
+        from src.state import get_youtube_entries
+        assert get_youtube_entries({}) == {}
+        assert get_youtube_entries({"youtube": {}}) == {}

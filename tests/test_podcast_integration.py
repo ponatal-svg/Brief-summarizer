@@ -159,6 +159,101 @@ class TestFetchEpisodesLive:
 
 
 @pytest.mark.integration
+class TestDependencyHealth:
+    """Canary tests for all external dependencies — run these first when diagnosing failures.
+
+    Fast checks (no audio download, no Gemini quota used) that pinpoint
+    exactly which dependency is broken before running heavier tests.
+
+    Diagnostic mapping:
+      iTunes API down  → test_itunes_api_reachable fails
+      RSS feed blocked → test_rss_feed_reachable fails
+      yt-dlp broken    → test_youtube_integration.py::TestTranscriptApiHealth fails
+      Gemini key bad   → test_gemini_api_key_valid fails
+      ffmpeg missing   → test_ffmpeg_available fails
+    """
+
+    def test_itunes_api_reachable(self):
+        """iTunes Search API responds with valid JSON for a known show."""
+        import urllib.request, urllib.parse, json
+        params = urllib.parse.urlencode(
+            {"term": "Hard Fork", "entity": "podcast", "limit": "1"}
+        )
+        url = f"https://itunes.apple.com/search?{params}"
+        req = urllib.request.Request(url, headers={"User-Agent": "MorningBrief/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        assert "results" in data, "iTunes API returned unexpected structure"
+        assert len(data["results"]) > 0, (
+            "iTunes search returned no results for 'Hard Fork' — "
+            "API may be degraded or the show has been delisted."
+        )
+
+    def test_rss_feed_reachable(self):
+        """A known RSS feed URL is reachable and returns valid RSS XML."""
+        import urllib.request
+        # Hard Fork Simplecast RSS — stable, widely distributed
+        rss_url = "https://feeds.simplecast.com/l2i9YnTd"
+        req = urllib.request.Request(rss_url, headers={"User-Agent": "MorningBrief/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content = resp.read(2048)
+        assert b"<rss" in content or b"<feed" in content, (
+            f"RSS feed at {rss_url} did not return valid XML. "
+            "Feed URL may have changed — update in tests or config.yaml."
+        )
+
+    def test_gemini_api_key_valid(self):
+        """GEMINI_API_KEY is set and accepted (cheap list-models call, no quota used)."""
+        import os
+        if not os.environ.get("GEMINI_API_KEY"):
+            pytest.skip("GEMINI_API_KEY not set")
+        from src.summarizer import create_client
+        client = create_client()
+        try:
+            models = list(client.models.list())
+            assert len(models) > 0, "No models returned — API key may be invalid"
+        except Exception as e:
+            error_str = str(e).lower()
+            if "401" in str(e) or "403" in str(e) or "api_key_invalid" in error_str:
+                pytest.fail(
+                    f"GEMINI_API_KEY is invalid or expired: {e}\n"
+                    "Generate a new key at https://aistudio.google.com/app/apikey"
+                )
+            elif "429" in str(e) or "quota" in error_str:
+                pytest.skip(f"Gemini quota exhausted — try again later: {e}")
+            else:
+                raise
+
+    def test_python_dependencies_importable(self):
+        """All required packages can be imported — catches missing pip installs."""
+        missing = []
+        for module, package in [
+            ("yt_dlp", "yt-dlp"),
+            ("youtube_transcript_api", "youtube-transcript-api"),
+            ("google.genai", "google-genai"),
+            ("yaml", "pyyaml"),
+            ("dotenv", "python-dotenv"),
+        ]:
+            try:
+                __import__(module)
+            except ImportError:
+                missing.append(package)
+        assert not missing, (
+            f"Missing packages: {missing}\n"
+            f"Fix: pip install {' '.join(missing)}"
+        )
+
+    def test_ffmpeg_available(self):
+        """ffmpeg is in PATH — required for podcast audio trimming."""
+        import subprocess
+        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, timeout=5)
+        assert result.returncode == 0, (
+            "ffmpeg not found in PATH.\n"
+            "Install: brew install ffmpeg  (macOS)  |  apt install ffmpeg  (Linux)"
+        )
+
+
+@pytest.mark.integration
 class TestTranscriptionLive:
     """Verify full download + transcription pipeline.
 

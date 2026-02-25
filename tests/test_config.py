@@ -376,3 +376,83 @@ class TestConfigProperties:
     def test_category_names(self, valid_raw_config):
         config = _parse_config(valid_raw_config)
         assert config.category_names == {"AI", "Wellbeing"}
+
+
+# ---------------------------------------------------------------------------
+# Tests: uncovered validation branches
+# ---------------------------------------------------------------------------
+
+class TestUncoveredValidationBranches:
+    """Target the specific lines not yet exercised in config.py."""
+
+    def test_category_item_not_a_dict_raises(self, valid_raw_config):
+        """Line 115: category must be a mapping."""
+        valid_raw_config["categories"] = ["just_a_string"]
+        with pytest.raises(ConfigError, match="mapping"):
+            _parse_config(valid_raw_config)
+
+    def test_youtube_sources_not_a_list_raises(self, valid_raw_config):
+        """Line 134: sources.youtube must be a list."""
+        valid_raw_config["sources"]["youtube"] = "not_a_list"
+        with pytest.raises(ConfigError, match="must be a list"):
+            _parse_config(valid_raw_config)
+
+    def test_youtube_source_item_not_a_dict_raises(self, valid_raw_config):
+        """Line 139: each YouTube source must be a mapping."""
+        valid_raw_config["sources"]["youtube"] = ["not_a_dict"]
+        with pytest.raises(ConfigError, match="mapping"):
+            _parse_config(valid_raw_config)
+
+    def test_podcast_shows_not_a_list_raises(self, valid_raw_config):
+        """Line 163: sources.podcasts must be a list."""
+        valid_raw_config["sources"]["podcasts"] = "not_a_list"
+        with pytest.raises(ConfigError, match="must be a list"):
+            _parse_config(valid_raw_config)
+
+    def test_podcast_show_item_not_a_dict_raises(self, valid_raw_config):
+        """Line 168: each podcast show must be a mapping."""
+        valid_raw_config["sources"]["podcasts"] = ["not_a_dict"]
+        with pytest.raises(ConfigError, match="mapping"):
+            _parse_config(valid_raw_config)
+
+    def test_podcast_show_missing_name_raises(self, valid_raw_config):
+        """Line 175: podcast show missing 'name'."""
+        valid_raw_config["sources"]["podcasts"] = [{
+            "podcast_url": "https://example.com/feed.rss",
+            "category": "AI",
+        }]
+        with pytest.raises(ConfigError, match="missing 'name'"):
+            _parse_config(valid_raw_config)
+
+    def test_podcast_show_missing_category_raises(self, valid_raw_config):
+        """Line 177: podcast show missing 'category'."""
+        valid_raw_config["sources"]["podcasts"] = [{
+            "podcast_url": "https://example.com/feed.rss",
+            "name": "Test Show",
+        }]
+        with pytest.raises(ConfigError, match="missing 'category'"):
+            _parse_config(valid_raw_config)
+
+    def test_settings_not_a_dict_raises(self, valid_raw_config):
+        """Line 188: settings must be a mapping."""
+        valid_raw_config["settings"] = "not_a_dict"
+        with pytest.raises(ConfigError, match="must be a mapping"):
+            _parse_config(valid_raw_config)
+
+    def test_notify_email_not_a_string_raises(self, valid_raw_config):
+        """Lines 214-217: notify_email must be a string if provided."""
+        valid_raw_config["settings"]["notify_email"] = 12345
+        with pytest.raises(ConfigError, match="notify_email.*must be a string"):
+            _parse_config(valid_raw_config)
+
+    def test_notify_email_none_is_valid(self, valid_raw_config):
+        """notify_email: null in YAML should produce None in Settings."""
+        valid_raw_config["settings"]["notify_email"] = None
+        config = _parse_config(valid_raw_config)
+        assert config.settings.notify_email is None
+
+    def test_notify_email_empty_string_becomes_none(self, valid_raw_config):
+        """notify_email: '' should coerce to None (falsy string)."""
+        valid_raw_config["settings"]["notify_email"] = ""
+        config = _parse_config(valid_raw_config)
+        assert config.settings.notify_email is None

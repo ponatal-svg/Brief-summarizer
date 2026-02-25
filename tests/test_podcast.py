@@ -1184,3 +1184,266 @@ class TestDownloadAndTranscribe:
         # Temp directory should have been cleaned up
         assert created_tmpdir is not None
         assert not os.path.exists(created_tmpdir)
+
+
+# ---------------------------------------------------------------------------
+# Tests: uncovered error paths in podcast.py
+# ---------------------------------------------------------------------------
+
+class TestFetchNewEpisodesRSSParseError:
+    """Line 119-121: RSS parse exception is re-raised."""
+
+    def test_rss_parse_error_propagates(self):
+        from src.config import PodcastShow
+        from src.fetchers.podcast import fetch_new_episodes
+
+        show = PodcastShow(
+            podcast_url="https://example.com/feed.rss",
+            name="Test Show", category="AI",
+        )
+        rss_cache = {"https://example.com/feed.rss": "https://example.com/feed.rss"}
+
+        with patch("src.fetchers.podcast._parse_rss_feed",
+                   side_effect=ValueError("invalid XML")):
+            with pytest.raises(ValueError, match="invalid XML"):
+                fetch_new_episodes(
+                    show=show,
+                    processed_ids=set(),
+                    lookback_hours=26,
+                    max_episodes=3,
+                    min_episodes=1,
+                    rss_cache=rss_cache,
+                )
+
+
+class TestResolveRssFeedStrategy3:
+    """Lines 208-209: Strategy 3 — validate podcast_url directly (non-Spotify/Apple)."""
+
+    def test_non_spotify_url_validated_directly(self):
+        from src.fetchers.podcast import resolve_rss_feed
+
+        with patch("src.fetchers.podcast._lookup_itunes", return_value=None):
+            with patch("src.fetchers.podcast._looks_like_rss_url", return_value=False):
+                with patch("src.fetchers.podcast._validate_rss_url", return_value=True):
+                    result = resolve_rss_feed(
+                        "Some Show",
+                        "https://example.com/rss-feed",
+                    )
+        assert result == "https://example.com/rss-feed"
+
+    def test_itunes_503_retries_then_returns_none(self):
+        """Lines 251-252: iTunes HTTP 503 returns None after retries."""
+        from src.fetchers.podcast import _lookup_itunes
+        from urllib.error import HTTPError
+
+        http_503 = HTTPError(url="u", code=503, msg="Service Unavailable",
+                             hdrs=None, fp=None)
+        # Return 503 for all retries → function returns None
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=http_503):
+            with patch("src.fetchers.podcast.time.sleep"):
+                result = _lookup_itunes("Some Show")
+        assert result is None
+
+    def test_itunes_url_error_returns_none(self):
+        """Lines 253-255: iTunes URLError returns None."""
+        from src.fetchers.podcast import _lookup_itunes
+        from urllib.error import URLError
+
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=URLError("network down")):
+            result = _lookup_itunes("Some Show")
+        assert result is None
+
+    def test_itunes_generic_exception_returns_none(self):
+        """Line 260: Other exceptions return None."""
+        from src.fetchers.podcast import _lookup_itunes
+
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=RuntimeError("unexpected")):
+            result = _lookup_itunes("Some Show")
+        assert result is None
+
+
+class TestFetchRSSContentRetry:
+    """Lines 289-290, 319-321: RSS fetch retry on 429/503 and URLError."""
+
+    def test_rss_fetch_retries_on_429(self):
+        """429 causes a retry; succeeds on second attempt."""
+        from src.fetchers.podcast import _fetch_rss_content
+        from urllib.error import HTTPError
+
+        http_429 = HTTPError(url="u", code=429, msg="Too Many Requests",
+                             hdrs=None, fp=None)
+        good_response = MagicMock()
+        good_response.__enter__ = MagicMock(return_value=good_response)
+        good_response.__exit__ = MagicMock(return_value=False)
+        good_response.read = MagicMock(return_value=b"<rss>feed</rss>")
+
+        call_count = 0
+
+        def urlopen_side_effect(req, timeout=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise http_429
+            return good_response
+
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=urlopen_side_effect):
+            with patch("src.fetchers.podcast.time.sleep"):
+                content = _fetch_rss_content("https://example.com/feed.rss")
+
+        assert content == b"<rss>feed</rss>"
+        assert call_count == 2
+
+    def test_rss_fetch_retries_on_url_error(self):
+        """URLError retries; raises after all attempts exhausted."""
+        from src.fetchers.podcast import _fetch_rss_content
+        from urllib.error import URLError
+
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=URLError("connection refused")):
+            with patch("src.fetchers.podcast.time.sleep"):
+                with pytest.raises(URLError):
+                    _fetch_rss_content("https://example.com/feed.rss")
+
+
+class TestDownloadDirectErrors:
+    """Lines 521, 531, 549: direct download error paths."""
+
+    def test_redirect_raises_audio_download_error(self):
+        """Lines 530-534: HTTP 301 raises AudioDownloadError with actionable message."""
+        from src.fetchers.podcast import _download_direct, AudioDownloadError
+        from urllib.error import HTTPError
+
+        http_301 = HTTPError(url="u", code=301, msg="Moved Permanently",
+                             hdrs=None, fp=None)
+
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=http_301):
+            with pytest.raises(AudioDownloadError, match="redirect"):
+                _download_direct("https://example.com/ep.mp3", "/tmp/out.mp3",
+                                 max_bytes=1024 * 1024)
+
+    def test_url_error_after_retries_raises(self):
+        """Line 544-547: URLError after all retries raises AudioDownloadError."""
+        from src.fetchers.podcast import _download_direct, AudioDownloadError
+        from urllib.error import URLError
+
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=URLError("host unreachable")):
+            with patch("src.fetchers.podcast.time.sleep"):
+                with pytest.raises(AudioDownloadError, match="Network error"):
+                    _download_direct("https://example.com/ep.mp3", "/tmp/out.mp3",
+                                     max_bytes=1024 * 1024)
+
+    def test_max_retries_exhausted_raises(self):
+        """Line 549: after MAX_RETRIES 429 responses, raises AudioDownloadError."""
+        from src.fetchers.podcast import _download_direct, AudioDownloadError
+        from urllib.error import HTTPError
+
+        http_429 = HTTPError(url="u", code=429, msg="Too Many Requests",
+                             hdrs=None, fp=None)
+
+        with patch("src.fetchers.podcast.urllib.request.urlopen",
+                   side_effect=http_429):
+            with patch("src.fetchers.podcast.time.sleep"):
+                with pytest.raises(AudioDownloadError):
+                    _download_direct("https://example.com/ep.mp3", "/tmp/out.mp3",
+                                     max_bytes=1024 * 1024)
+
+
+class TestTranscriptionErrorPaths:
+    """Lines 670-671, 688-689: Gemini auth, quota, file-too-large, cleanup errors."""
+
+    @pytest.fixture
+    def audio_file(self, tmp_path):
+        p = tmp_path / "episode.mp3"
+        p.write_bytes(b"\xff\xfb" * 100)  # minimal fake MP3 header
+        return str(p)
+
+    @pytest.fixture
+    def sample_episode_fixture(self):
+        from datetime import datetime, timezone
+        return EpisodeInfo(
+            episode_id="ep1", title="Test Episode", show_name="Test Show",
+            show_url="https://example.com", episode_url="https://example.com/ep1",
+            audio_url="https://cdn.example.com/ep1.mp3",
+            category="AI", published_at=datetime.now(timezone.utc),
+            duration_seconds=1800,
+        )
+
+    def test_auth_error_raises_transcription_error(self, audio_file, sample_episode_fixture):
+        """Lines 662-666: 401 error raises TranscriptionError immediately."""
+        from src.fetchers.podcast import _transcribe_and_summarize, TranscriptionError
+
+        mock_client = MagicMock()
+        mock_client.files.upload.side_effect = Exception("401 Unauthorized")
+
+        with pytest.raises(TranscriptionError, match="authentication"):
+            _transcribe_and_summarize(
+                audio_path=audio_file,
+                episode=sample_episode_fixture,
+                client=mock_client,
+                model="gemini-2.5-flash",
+                max_audio_minutes=60,
+            )
+
+    def test_quota_error_propagates(self, audio_file, sample_episode_fixture):
+        """Lines 669-671: daily quota error is re-raised (not wrapped)."""
+        from src.fetchers.podcast import _transcribe_and_summarize
+        from src.summarizer import QuotaExhaustedError
+
+        mock_client = MagicMock()
+        mock_client.files.upload.side_effect = Exception(
+            "429 resource_exhausted: daily quota exceeded"
+        )
+
+        with pytest.raises(Exception, match="quota"):
+            _transcribe_and_summarize(
+                audio_path=audio_file,
+                episode=sample_episode_fixture,
+                client=mock_client,
+                model="gemini-2.5-flash",
+                max_audio_minutes=60,
+            )
+
+    def test_file_too_large_raises_transcription_error(self, audio_file, sample_episode_fixture):
+        """Lines 674-678: file too large error raises TranscriptionError."""
+        from src.fetchers.podcast import _transcribe_and_summarize, TranscriptionError
+
+        mock_client = MagicMock()
+        mock_client.files.upload.side_effect = Exception("file too large for upload")
+
+        with pytest.raises(TranscriptionError, match="too large"):
+            _transcribe_and_summarize(
+                audio_path=audio_file,
+                episode=sample_episode_fixture,
+                client=mock_client,
+                model="gemini-2.5-flash",
+                max_audio_minutes=60,
+            )
+
+    def test_file_delete_failure_is_swallowed(self, audio_file, sample_episode_fixture):
+        """Lines 687-689: Gemini file.delete errors are silently swallowed."""
+        from src.fetchers.podcast import _transcribe_and_summarize, TranscriptionError
+
+        mock_uploaded = MagicMock()
+        mock_uploaded.name = "files/test-file"
+
+        mock_client = MagicMock()
+        mock_client.files.upload.return_value = mock_uploaded
+        mock_client.files.get.return_value = MagicMock(state="ACTIVE")
+        mock_client.models.generate_content.return_value = MagicMock(text="summary")
+        mock_client.files.delete.side_effect = Exception("delete failed")
+
+        # Should NOT raise despite delete failure
+        result = _transcribe_and_summarize(
+            audio_path=audio_file,
+            episode=sample_episode_fixture,
+            client=mock_client,
+            model="gemini-2.5-flash",
+            max_audio_minutes=60,
+        )
+        assert result == "summary"
