@@ -715,6 +715,8 @@ function renderDigest(md, dateStr) {
 
   if (cardCount === 0) {
     content.innerHTML = '<div class="empty">No new content for ' + dateStr + '.</div>';
+    var countEl = document.getElementById('visibleCount');
+    if (countEl) countEl.textContent = 0;
   } else {
     content.innerHTML = html;
     applyFilter(currentFilter);
