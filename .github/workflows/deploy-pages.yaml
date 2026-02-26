@@ -1,7 +1,11 @@
 name: Deploy Pages
 
 on:
-  workflow_dispatch: # Manual trigger only
+  workflow_dispatch: # Manual trigger
+  push:
+    branches: [main]
+    paths:
+      - 'output/**'
 
 permissions:
   contents: read
