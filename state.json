@@ -1,11 +1,15 @@
 {
   "podcasts": {
+    "0ceb773f3593beb7": "2026-02-26",
     "0ff985d66a7b5a5a": "2026-02-23",
     "2d16c1a667ff5e46": "2026-02-23",
+    "2e785fcb1243daf7": "2026-02-26",
     "534c316146e187bb": "2026-02-25",
+    "7229302c989100da": "2026-02-26",
     "763a4bc045c2581d": "2026-02-24",
     "798e6da0af6311fb": "2026-02-23",
     "7da6c16d5d7838e9": "2026-02-25",
+    "8f5efbca524ae455": "2026-02-26",
     "9eccbaa814e76048": "2026-02-23",
     "a86d6830223b059e": "2026-02-23",
     "b22fc61a72fe2e40": "2026-02-23",
@@ -15,14 +19,16 @@
     "fbb864e838dc2caa": "2026-02-24"
   },
   "rss_cache": {
+    "https://open.spotify.com/show/02HrvZIs1Az8vwVu6VMbXE": "https://anchor.fm/s/1047a9180/podcast/rss",
     "https://open.spotify.com/show/0sGGLIDnnijRPLef7InllD": "https://feeds.acast.com/public/shows/69779e4cf4b515342e3b249c",
     "https://open.spotify.com/show/11VjrLJfoiNvgjjqov4RWh": "https://feeds.megaphone.fm/ISML9402684841",
     "https://open.spotify.com/show/44fllCS2FTFr2x2kjP9xeT": "https://feeds.simplecast.com/6HKOhNgS",
+    "https://open.spotify.com/show/5R8lUT8RpQHpgm3I0ezAmK": "https://anchor.fm/s/1015d9178/podcast/rss",
+    "https://open.spotify.com/show/6W7E3AEVC2UOp8ewdJY1MN": "https://anchor.fm/s/10ea64dc0/podcast/rss",
     "https://rss.libsyn.com/shows/136379/destinations/844493.xml": "https://rss.libsyn.com/shows/136379/destinations/844493.xml"
   },
   "youtube": {
     "-q2n5DkDoMQ": "2026-02-23",
-    "1PxEziv5XIU": "2026-02-18",
     "2_DPnzoiHaY": "2026-02-23",
     "8i0zxyHKbfk": "2026-02-23",
     "8jKAT8GNDE0": "2026-02-23",
@@ -36,9 +42,6 @@
       "date": "2026-02-25",
       "title": "Caught Distilling from Claude?"
     },
-    "bDcgHzCBgmQ": "2026-02-18",
-    "hnmaACbNYFY": "2026-02-18",
-    "nuLRyPudALI": "2026-02-18",
     "uQ01Y_goUXg": "2026-02-23",
     "v2md4VScsnA": "2026-02-23"
   }
