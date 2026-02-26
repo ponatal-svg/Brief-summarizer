@@ -155,7 +155,6 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
         if not video.transcript:
             msg = f"No transcript available for '{video.title}' — skipping"
             logger.warning(msg)
-            errors.append({"source": f"Transcript/{video.channel_name}", "message": msg})
             skipped_items.append({
                 "type": "youtube",
                 "source": video.channel_name,
@@ -286,7 +285,6 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
             video_id = str(e)
             msg = f"YouTube IP block for {source.name} — video {video_id} queued for retry"
             logger.warning(msg)
-            errors.append({"source": f"Transcript/{source.name}", "message": msg})
             skipped_items.append({
                 "type": "youtube",
                 "source": source.name,

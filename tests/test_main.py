@@ -129,7 +129,7 @@ class TestYouTubePipeline:
                                                             )
 
     def test_skips_video_without_transcript(self, tmp_path, config, sample_video):
-        """Videos with no transcript are skipped — error logged, no Gemini call made."""
+        """Videos with no transcript are an operational skip — no SystemExit, no Gemini call."""
         no_transcript_video = VideoInfo(
             video_id="vid1", title="No Transcript",
             url="https://youtube.com/watch?v=vid1",
@@ -150,12 +150,13 @@ class TestYouTubePipeline:
                                             with patch("src.main.save_state"):
                                                 with patch("src.main.cleanup_old_content", return_value=[]):
                                                     with patch("src.main.cleanup_state"):
-                                                        with pytest.raises(SystemExit):
-                                                            run(
-                                                                config_path=tmp_path / "config.yaml",
-                                                                output_dir=tmp_path / "output",
-                                                                state_path=tmp_path / "state.json",
-                                                            )
+                                                        # Must NOT raise SystemExit — missing transcript
+                                                        # is an operational skip, not a hard error
+                                                        run(
+                                                            config_path=tmp_path / "config.yaml",
+                                                            output_dir=tmp_path / "output",
+                                                            state_path=tmp_path / "state.json",
+                                                        )
 
         mock_summarize.assert_not_called()
 
@@ -237,7 +238,8 @@ class TestYouTubePipeline:
 
 
     def test_ip_blocked_error_recorded_in_state(self, tmp_path, config):
-        """When fetch_new_videos raises IpBlockedError, video is recorded in ip_blocked state."""
+        """When fetch_new_videos raises IpBlockedError, video is recorded in ip_blocked state.
+        Crucially, this must NOT cause sys.exit(1) — it is an operational skip, not a hard error."""
         with patch("src.main.load_config", return_value=config):
             with patch("src.main.create_client", return_value=MagicMock()):
                 with patch("src.main.fetch_new_videos", side_effect=IpBlockedError("vid_blocked")):
@@ -249,12 +251,13 @@ class TestYouTubePipeline:
                                         with patch("src.main.save_state") as mock_save:
                                             with patch("src.main.cleanup_old_content", return_value=[]):
                                                 with patch("src.main.cleanup_state"):
-                                                    with pytest.raises(SystemExit):
-                                                        run(
-                                                            config_path=tmp_path / "config.yaml",
-                                                            output_dir=tmp_path / "output",
-                                                            state_path=tmp_path / "state.json",
-                                                        )
+                                                    # Must NOT raise SystemExit — IP block is
+                                                    # an operational skip queued for retry
+                                                    run(
+                                                        config_path=tmp_path / "config.yaml",
+                                                        output_dir=tmp_path / "output",
+                                                        state_path=tmp_path / "state.json",
+                                                    )
 
         # State should have been saved with the ip_blocked entry
         assert mock_save.called
