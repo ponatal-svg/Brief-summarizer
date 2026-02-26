@@ -307,3 +307,65 @@ class TestCleanupOldContentPodcasts:
         assert not yt_file.exists()
         assert not pod_file.exists()
         assert len(removed) == 2
+
+
+class TestCleanupBoundary:
+    """Exact boundary: with max_age_days=7, day-7 is removed and day-6 is kept.
+    Previously the code used < (strict) so day-7 was kept, giving 8 days of content.
+    """
+
+    def test_content_on_cutoff_day_is_removed(self, tmp_path):
+        """A file exactly max_age_days old should be removed (not kept)."""
+        cutoff_date = _date_str(7)  # exactly 7 days ago = the cutoff
+        daily_dir = tmp_path / "daily"
+        daily_dir.mkdir(parents=True)
+        cutoff_file = daily_dir / f"{cutoff_date}.md"
+        cutoff_file.write_text("cutoff day content")
+
+        removed = cleanup_old_content(tmp_path, max_age_days=7)
+
+        assert not cutoff_file.exists(), "Cutoff-day file must be removed to keep exactly 7 days"
+        assert len(removed) == 1
+
+    def test_content_one_day_inside_window_is_kept(self, tmp_path):
+        """A file max_age_days-1 old should be kept."""
+        keep_date = _date_str(6)  # 6 days ago = one day inside the 7-day window
+        daily_dir = tmp_path / "daily"
+        daily_dir.mkdir(parents=True)
+        keep_file = daily_dir / f"{keep_date}.md"
+        keep_file.write_text("recent content")
+
+        removed = cleanup_old_content(tmp_path, max_age_days=7)
+
+        assert keep_file.exists(), "File within window must be kept"
+        assert len(removed) == 0
+
+    def test_state_entry_on_cutoff_day_is_removed(self, tmp_path):
+        """A state entry exactly max_age_days old should be purged."""
+        cutoff_date = _date_str(7)
+        state_path = tmp_path / "state.json"
+        state_path.write_text(json.dumps({
+            "youtube": {"vid_cutoff": cutoff_date},
+            "podcasts": {},
+            "rss_cache": {},
+        }))
+
+        cleanup_state(state_path, max_age_days=7)
+
+        result = json.loads(state_path.read_text())
+        assert "vid_cutoff" not in result["youtube"], "Cutoff-day state entry must be removed"
+
+    def test_state_entry_one_day_inside_window_is_kept(self, tmp_path):
+        """A state entry max_age_days-1 old should be kept."""
+        keep_date = _date_str(6)
+        state_path = tmp_path / "state.json"
+        state_path.write_text(json.dumps({
+            "youtube": {"vid_keep": keep_date},
+            "podcasts": {},
+            "rss_cache": {},
+        }))
+
+        cleanup_state(state_path, max_age_days=7)
+
+        result = json.loads(state_path.read_text())
+        assert "vid_keep" in result["youtube"], "Entry within window must be kept"

@@ -23,6 +23,8 @@ def cleanup_old_content(output_dir: Path, max_age_days: int) -> list:
 
     Returns list of removed paths (for logging).
     """
+    # Keep the last max_age_days days inclusive. With today=2026-02-25 and max_age_days=7
+    # we keep Feb 19–25 (7 days), so the cutoff is Feb 18 — anything <= cutoff is removed.
     cutoff = datetime.now(timezone.utc).date() - timedelta(days=max_age_days)
     removed = []
 
@@ -33,7 +35,7 @@ def cleanup_old_content(output_dir: Path, max_age_days: int) -> list:
                 if not date_dir.is_dir():
                     continue
                 date = _parse_date_from_name(date_dir.name)
-                if date and date < cutoff:
+                if date and date <= cutoff:
                     shutil.rmtree(date_dir)
                     removed.append(str(date_dir))
                     logger.info(f"Removed expired summaries: {date_dir.name}")
@@ -43,7 +45,7 @@ def cleanup_old_content(output_dir: Path, max_age_days: int) -> list:
         if daily_dir.exists():
             for md_file in daily_dir.glob("*.md"):
                 date = _parse_date_from_name(md_file.stem)
-                if date and date < cutoff:
+                if date and date <= cutoff:
                     md_file.unlink()
                     removed.append(str(md_file))
                     logger.info(f"Removed expired digest: {md_file.name}")
@@ -55,7 +57,7 @@ def cleanup_old_content(output_dir: Path, max_age_days: int) -> list:
             # Error files are named YYYY-MM-DD-errors.md
             date_part = md_file.stem.replace("-errors", "")
             date = _parse_date_from_name(date_part)
-            if date and date < cutoff:
+            if date and date <= cutoff:
                 md_file.unlink()
                 removed.append(str(md_file))
                 logger.info(f"Removed expired error report: {md_file.name}")
@@ -101,7 +103,7 @@ def cleanup_state(state_path: Path, max_age_days: int) -> None:
                 # date_val may be a plain string (legacy) or a dict {"date": ..., ...}
                 date_str = date_val["date"] if isinstance(date_val, dict) else date_val
                 date = _parse_date_from_name(date_str)
-                if date and date >= cutoff:
+                if date and date > cutoff:
                     cleaned_section[entry_id] = date_val
                 else:
                     removed_count += 1
@@ -112,7 +114,7 @@ def cleanup_state(state_path: Path, max_age_days: int) -> None:
         cleaned = {}
         for video_id, date_str in state.items():
             date = _parse_date_from_name(date_str)
-            if date and date >= cutoff:
+            if date and date > cutoff:
                 cleaned[video_id] = date_str
         removed_count = original_count - len(cleaned)
 
