@@ -416,13 +416,14 @@ class TestDateNavigation:
 
 class TestSummaryParsing:
     def test_parses_hook_section(self, generated_html):
-        assert "'## The Hook'" in generated_html
+        # Parser uses regex to accept ## or ### with/without colon
+        assert "The Hook$/" in generated_html
 
     def test_parses_key_findings(self, generated_html):
-        assert "'## Key Findings'" in generated_html
+        assert "Key Findings:?$/" in generated_html
 
     def test_parses_so_what(self, generated_html):
-        assert "'## The So What?'" in generated_html
+        assert r"The So What\??$/" in generated_html
 
     def test_numbered_findings(self, generated_html):
         assert "finding-num" in generated_html

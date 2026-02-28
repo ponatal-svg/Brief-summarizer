@@ -270,8 +270,16 @@ def _get_transcript(video_id: str, language: str = "en") -> tuple:
                 f"refresh cookies.txt to restore access"
             )
             raise IpBlockedError(video_id)
-        except (TranscriptsDisabled, VideoUnavailable):
-            logger.info(f"  No transcript available for {video_id}")
+        except (TranscriptsDisabled, VideoUnavailable) as e:
+            cookies_active = (Path(__file__).parent.parent.parent / "cookies.txt").exists()
+            if isinstance(e, TranscriptsDisabled) and not cookies_active:
+                logger.warning(
+                    f"  TranscriptsDisabled for {video_id} — no cookies.txt loaded. "
+                    f"On GitHub Actions this often means an IP block, not genuinely disabled captions. "
+                    f"Add YOUTUBE_COOKIES secret to fix."
+                )
+            else:
+                logger.info(f"  No transcript available for {video_id} ({type(e).__name__})")
             return None, ()
         except NoTranscriptFound:
             break  # Fall through to try any available language

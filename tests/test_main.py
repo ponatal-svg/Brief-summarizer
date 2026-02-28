@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
@@ -553,13 +553,14 @@ class TestIpBlockedRetry:
         self, tmp_path, config, sample_video
     ):
         """A video in ip_blocked state is retried; on success it moves to youtube state."""
+        recent = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
         state_with_blocked = {
             "youtube": {},
             "podcasts": {},
             "rss_cache": {},
             "ip_blocked": {
                 "vid_blocked": {
-                    "date": "2026-02-20",
+                    "date": recent,
                     "title": "Blocked Video",
                     "url": "https://youtube.com/watch?v=vid_blocked",
                     "channel": "Test Channel",
@@ -598,13 +599,14 @@ class TestIpBlockedRetry:
 
     def test_still_blocked_video_stays_in_ip_blocked(self, tmp_path, config):
         """A video that's still IP-blocked on retry stays in ip_blocked state."""
+        recent = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
         state_with_blocked = {
             "youtube": {},
             "podcasts": {},
             "rss_cache": {},
             "ip_blocked": {
                 "vid_still_blocked": {
-                    "date": "2026-02-20",
+                    "date": recent,
                     "title": "Still Blocked",
                     "url": "https://youtube.com/watch?v=vid_still_blocked",
                     "channel": "Test Channel",

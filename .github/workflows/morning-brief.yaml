@@ -31,6 +31,13 @@ jobs:
           pip install -r requirements.txt
           pip install yt-dlp
 
+      - name: Write YouTube cookies (bypasses datacenter IP block)
+        # YOUTUBE_COOKIES secret: export your cookies.txt from a logged-in browser session
+        # using the "Get cookies.txt LOCALLY" extension (Netscape format).
+        # Without this, GitHub Actions IPs receive TranscriptsDisabled from YouTube's API.
+        if: ${{ secrets.YOUTUBE_COOKIES != '' }}
+        run: echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+
       - name: Run Morning Brief pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

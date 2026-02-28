@@ -58,12 +58,15 @@ sources:
     - podcast_url: "https://open.spotify.com/show/5R8lUT8RpQHpgm3I0ezAmK"
       name: "בסלון של יסמין"
       category: "News"
+      language: "he"
     - podcast_url: "https://open.spotify.com/show/6W7E3AEVC2UOp8ewdJY1MN"
       name: "הפודקאסט של נדב פרי"
       category: "News"
+      language: "he"
     - podcast_url: "https://open.spotify.com/show/02HrvZIs1Az8vwVu6VMbXE"
       name: "פודקאסט שולחן 4"
       category: "News"
+      language: "he"
 
 settings:
   max_age_days: 7
