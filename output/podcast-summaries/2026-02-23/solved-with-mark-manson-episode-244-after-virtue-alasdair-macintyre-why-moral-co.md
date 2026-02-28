@@ -6,7 +6,7 @@
 
 ---
 
-## The End of Moral Understanding: MacIntyre's Diagnosis
+## The Hook
 
 This episode explores Alasdair MacIntyre's seminal work, *After Virtue*, diagnosing why modern moral conversations often feel unsatisfying and offering a path to restoring their productivity by re-evaluating the role of teleology and virtue ethics.
 

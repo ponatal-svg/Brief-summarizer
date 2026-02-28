@@ -758,8 +758,10 @@ async function toggleSummary(id) {
       ttsIntro += '. ';
       /* Extract only Key Findings and So What sections for TTS */
       var ttsBody = extractTTSBody(summaryMd);
-      /* Strip markdown syntax and URLs from TTS text */
+      /* Strip markdown syntax, URLs and timestamp markers from TTS text */
       var plainBody = ttsBody
+        .replace(/\[\[t=\d+s\]\]\([^)]*\)/g, '') // strip [[t=NNs]](url) old format
+        .replace(/\[t=\d+s\]/g, '')                   // strip [t=NNs] timestamp markers
         .replace(/https?:\/\/[^\s)]+/g, '')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
         .replace(/[#*\[\]()>]/g, '')
@@ -783,9 +785,9 @@ function extractTTSBody(summaryMd) {
   var currentSection = '';
   for (var i = 0; i < lines.length; i++) {
     var trimmed = lines[i].trim();
-    if (trimmed === '## The Hook') { currentSection = 'hook'; continue; }
-    if (trimmed === '## Key Findings') { currentSection = 'findings'; result += 'Key findings. '; continue; }
-    if (trimmed === '## The So What?' || trimmed === '## The So What') { currentSection = 'sowhat'; result += 'So what. '; continue; }
+    if (/^#{2,3}\s+The Hook$/.test(trimmed)) { currentSection = 'hook'; continue; }
+    if (/^#{2,3}\s+Key Findings:?$/.test(trimmed)) { currentSection = 'findings'; result += 'Key findings. '; continue; }
+    if (/^#{2,3}\s+The So What\??$/.test(trimmed)) { currentSection = 'sowhat'; result += 'So what. '; continue; }
     if ((currentSection === 'findings' || currentSection === 'sowhat') && trimmed) {
       result += trimmed + ' ';
     }
@@ -805,9 +807,9 @@ function parseSummaryMd(md, cardId) {
   var lines = summaryMd.split('\n');
   for (var i = 0; i < lines.length; i++) {
     var trimmed = lines[i].trim();
-    if (trimmed === '## The Hook') { currentSection = 'hook'; continue; }
-    if (trimmed === '## Key Findings') { currentSection = 'findings'; continue; }
-    if (trimmed === '## The So What?' || trimmed === '## The So What') { currentSection = 'sowhat'; continue; }
+    if (/^#{2,3}\s+The Hook$/.test(trimmed)) { currentSection = 'hook'; continue; }
+    if (/^#{2,3}\s+Key Findings:?$/.test(trimmed)) { currentSection = 'findings'; continue; }
+    if (/^#{2,3}\s+The So What\??$/.test(trimmed)) { currentSection = 'sowhat'; continue; }
 
     if (currentSection === 'hook' && trimmed) hookText += trimmed + ' ';
     if (currentSection === 'findings' && trimmed.startsWith('*')) {
