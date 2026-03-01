@@ -627,6 +627,11 @@ async function loadDate(dateStr, fallback, explicit) {
   updateExpandBtn();
   stopTTS();
 
+  // Keep the URL in sync so deep-links and back/forward navigation work.
+  var params = new URLSearchParams(window.location.search);
+  params.set('date', dateStr);
+  history.replaceState(null, '', '?' + params.toString());
+
   document.querySelectorAll('.date-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.date === dateStr);
   });

@@ -380,22 +380,29 @@ class TestDateNavigation:
         fn_sig = fn_block[:fn_block.index("{")]
         assert "explicit" in fn_sig
 
+    def test_load_date_updates_url(self, generated_html):
+        # Switching dates must update the browser URL so deep-links stay correct.
+        fn_start = generated_html.index("function loadDate(")
+        fn_body = generated_html[fn_start:fn_start + 1200]
+        assert "history.replaceState" in fn_body
+        assert "params.set('date', dateStr)" in fn_body
+
     def test_auto_fallback_skipped_on_explicit_click(self, generated_html):
         # Fallback only fires when both fallback and explicit are falsy
         fn_start = generated_html.index("function loadDate(")
-        fn_body = generated_html[fn_start:fn_start + 800]
+        fn_body = generated_html[fn_start:fn_start + 1200]
         assert "!explicit" in fn_body
 
     def test_auto_fallback_only_on_initial_load(self, generated_html):
         # The condition guarding fallback requires !fallback AND !explicit
         fn_start = generated_html.index("function loadDate(")
-        fn_body = generated_html[fn_start:fn_start + 800]
+        fn_body = generated_html[fn_start:fn_start + 1200]
         assert "!fallback && !explicit" in fn_body
 
     def test_explicit_click_highlights_clicked_date(self, generated_html):
         # date-btn active class is set to the requested dateStr, not a fallback date
         fn_start = generated_html.index("function loadDate(")
-        fn_body = generated_html[fn_start:fn_start + 800]
+        fn_body = generated_html[fn_start:fn_start + 1200]
         # active class toggle uses dateStr (the explicitly-clicked date)
         assert "b.dataset.date === dateStr" in fn_body
 

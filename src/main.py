@@ -163,6 +163,10 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                 "reason": "Transcript unavailable (captions disabled or video unavailable)",
                 "action": "No action needed — captions are disabled for this video.",
             })
+            # Mark as processed so this video is not retried on future runs.
+            # Captions disabled is a permanent condition for a given video.
+            mark_youtube_processed(state, video.video_id, date_str,
+                                   channel=video.channel_name, title=video.title)
             return False
 
         try:
@@ -318,7 +322,6 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
 
             try:
                 _process_video(video)
-                processed_video_ids.add(video.video_id)
             except QuotaExhaustedError as e:
                 logger.error("Daily Gemini quota exhausted — saving progress and stopping early")
                 errors.append({"source": "Gemini/QuotaExhausted", "message": str(e)})
@@ -335,6 +338,10 @@ def run(config_path: Path, output_dir: Path, state_path: Path, dry_run: bool = F
                     errors, skipped_items, output_dir, date_str, config,
                 )
                 return
+            # Always mark as seen — permanent skips (no transcript) should not be
+            # retried on subsequent runs; transient Gemini errors will be retried
+            # naturally when the channel is next fetched within the lookback window.
+            processed_video_ids.add(video.video_id)
 
     # -----------------------------------------------------------------------
     # Podcast pipeline

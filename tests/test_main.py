@@ -160,6 +160,42 @@ class TestYouTubePipeline:
 
         mock_summarize.assert_not_called()
 
+    def test_no_transcript_video_marked_in_state(self, tmp_path, config):
+        """Videos with no transcript must be written to state so they are not retried on future runs."""
+        state_path = tmp_path / "state.json"
+        no_transcript_video = VideoInfo(
+            video_id="no-captions-vid", title="Captions Disabled",
+            url="https://youtube.com/watch?v=no-captions-vid",
+            channel_name="Test Channel", category="AI",
+            upload_date=datetime.now(timezone.utc), duration_seconds=600,
+            transcript=None,
+        )
+
+        with patch("src.main.load_config", return_value=config):
+            with patch("src.main.create_client", return_value=MagicMock()):
+                with patch("src.main.fetch_new_videos", return_value=[no_transcript_video]):
+                    with patch("src.main.fetch_new_episodes", return_value=[]):
+                        with patch("src.main.summarize"):
+                            with patch("src.main.generate_daily_digest"):
+                                with patch("src.main.generate_podcast_daily_digest"):
+                                    with patch("src.main.generate_error_report"):
+                                        with patch("src.main.generate_viewer"):
+                                            with patch("src.main.cleanup_old_content", return_value=[]):
+                                                with patch("src.main.cleanup_state"):
+                                                    run(
+                                                        config_path=tmp_path / "config.yaml",
+                                                        output_dir=tmp_path / "output",
+                                                        state_path=state_path,
+                                                    )
+
+        # State file must contain the video ID so the next run skips it.
+        from src.state import load_state, get_processed_ids
+        state = load_state(state_path)
+        processed = get_processed_ids(state)
+        assert "no-captions-vid" in processed, (
+            "Video with no transcript must be marked in state to prevent re-processing on future runs"
+        )
+
     def test_youtube_fetch_error_logged_and_continues(self, tmp_path, config):
         with patch("src.main.load_config", return_value=config):
             with patch("src.main.create_client", return_value=MagicMock()):
